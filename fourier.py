@@ -26,7 +26,7 @@ def merge(*waves: List[np.ndarray]):
         arg = np.mean([np.angle(coeff) for coeff in coeffs])
         outs.append(mag * np.exp(1j * arg))
     
-    wave_out = np.fft.irfft(outs)
+    wave_out = irfft(outs)
     return gauss.rescale_quantize(wave_out)
 
 
