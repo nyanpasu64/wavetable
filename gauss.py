@@ -75,6 +75,9 @@ _gauss_table = ar([
 ])
 
 MAXRANGE = 16
+def set_range(maxrange):
+    global MAXRANGE
+    MAXRANGE = maxrange
 
 _gauss_table = cat(_gauss_table, _gauss_table[::-1])
 
@@ -156,7 +159,10 @@ def iround(a):
     return np.round(a).astype(int)
 
 
-def rescale_quantize(ys, maxrange=MAXRANGE, do_round='quantize', ret_tuple=False):
+# https://stackoverflow.com/questions/1132941/least-astonishment-and-the-mutable-default-argument#comment950592_1133013
+def rescale_quantize(ys, maxrange=None, do_round='quantize', ret_tuple=False):
+    if maxrange is None:
+        maxrange = MAXRANGE
     if do_round == 'round':
         def _quantize(ys, maxrange):
             return iround(ys)
