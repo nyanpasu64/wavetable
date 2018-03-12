@@ -37,7 +37,6 @@ def _load_waves(filename):
 
 
 def _merge_with(*waves: List[np.ndarray], nsamp, avg_func):
-    print(waves)
     ffts = [np.fft.rfft(wave) for wave in waves]
     
     outs = []
@@ -50,7 +49,7 @@ def _merge_with(*waves: List[np.ndarray], nsamp, avg_func):
     return gauss.rescale_quantize(wave_out)
 
 
-def merge(*waves: List[np.ndarray], nsamp=None):
+def amp_merge(*waves: List[np.ndarray], nsamp=None):
     """ Combines multiple waves[], taking the average *amplitude* of each harmonic. """
     return _merge_with(*waves, nsamp=nsamp, avg_func=np.mean)
 
@@ -93,30 +92,11 @@ def _pad_waves(waves, length):
     return cat(waves, [waves[-1]] * (length - len(waves)))
 
 
-def merge_all(instrs: List[Instr], nsamp):
+def merge_instrs(instrs: List[Instr], nsamp):
     """ Pads each Instr to longest. Then merges all and returns new $waves. """
     length = max(len(instr.waveseq) for instr in instrs)
-
-    # # [instr#][time] = wave
-    # padded_waveseqs = []
-    # for instr in instrs:
-    #     # [time] time<length
-    #     padded = _pad_waves(instr.waveseq, length)
-    #     padded_waveseqs.append(padded)
-
     merged_waveseq = []
 
-    # # at time, [instr#].
-    # for simul_waves in safezip(*padded_waveseqs):
-    #     # # list comprehensions?
-    #     # partials = []
-    #     # for instr, wave in safezip(instrs, simul_waves):
-    #     #     partial = Partial(wave, instr.freq, instr.amp)
-    #     #     partials.append(partial)
-
-    #     new_wave = _merge_harmonic(partials)
-    #     merged_waveseq.append(new_wave)
-    
     for i in range(length):
         merged_waveseq.append(_merge_harmonic(instrs, i, nsamp))
 
@@ -144,4 +124,4 @@ def combine(waveseq):
 
 def merge_combine(instrs: List[Instr], nsamp):
     """ merge and combine into minimal wave and MML string. """
-    combine(merge(instrs, nsamp))
+    combine(merge_instrs(instrs, nsamp))
