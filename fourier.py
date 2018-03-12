@@ -5,6 +5,15 @@ import numpy as np
 from . import gauss
 
 
+def _rms(ar):
+    square = np.array(ar) ** 2
+    mean = np.mean(square)
+    root = np.sqrt(mean)
+    return root
+
+
+
+
 def multiply(spectrum: np.ndarray, harmonic: int):
     """
     >>> multiply([1,2,3], 3)
@@ -16,18 +25,36 @@ def multiply(spectrum: np.ndarray, harmonic: int):
     return np.hstack([spectrum, zeros]).flatten()
 
 
-def merge(*waves: List[np.ndarray]):
-    """ Combines multiple waves[], taking the average *amplitude* of each harmonic. """
+def _merge_with(*waves: List[np.ndarray], avg_func):
+    """ Combines multiple waves[], taking the average *power* of each harmonic. """
     ffts = [np.fft.rfft(wave) for wave in waves]
     
     outs = []
     for coeffs in itertools.zip_longest(*ffts, fillvalue=0j):
-        mag = np.mean([np.abs(coeff) for coeff in coeffs])
-        arg = np.mean([np.angle(coeff) for coeff in coeffs])
+        mag = _rms(np.abs(coeffs))
+        arg = np.mean(np.angle(coeffs))
         outs.append(mag * np.exp(1j * arg))
     
     wave_out = irfft(outs)
     return gauss.rescale_quantize(wave_out)
+
+
+def merge(*waves: List[np.ndarray]):
+    """ Combines multiple waves[], taking the average *amplitude* of each harmonic. """
+    # ffts = [np.fft.rfft(wave) for wave in waves]
+    
+    # outs = []
+    # for coeffs in itertools.zip_longest(*ffts, fillvalue=0j):
+    #     mag = np.mean([np.abs(coeff) for coeff in coeffs])
+    #     arg = np.mean([np.angle(coeff) for coeff in coeffs])
+    #     outs.append(mag * np.exp(1j * arg))
+    
+    # wave_out = irfft(outs)
+    # return gauss.rescale_quantize(wave_out)
+    return _merge_with(*waves, avg_func=np.mean)
+
+def power_merge(*waves: List[np.ndarray]):
+    return _merge_with(*waves, avg_func=_rms)
 
 
 def irfft(spectrum: np.ndarray, nout=None):
