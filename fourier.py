@@ -1,18 +1,20 @@
+from typing import List, Union
+
 import numpy as np
 
 
-def multiply(spectrum: np.ndarray, harmonic: int):
-    """
-    >>> multiply([1,2,3], 3)
-    array([1., 0., 0., 2., 0., 0., 3., 0., 0.])
-    """
-    spectrum = np.array(spectrum) 
-    spectrum = spectrum.reshape([spectrum.size, 1])
-    zeros = np.zeros([spectrum.size, harmonic - 1])
-    return np.hstack([spectrum, zeros]).flatten()
+# def multiply(spectrum: Union[np.ndarray, List[complex]], harmonic: int):
+#     """
+#     >>> multiply([1,2,3], 3)
+#     array([1., 0., 0., 2., 0., 0., 3., 0., 0.])
+#     """
+#     spectrum = np.array(spectrum)
+#     spectrum = spectrum.reshape([spectrum.size, 1])
+#     zeros = np.zeros([spectrum.size, harmonic - 1])
+#     return np.hstack([spectrum, zeros]).flatten()
 
 
-def irfft(spectrum: np.ndarray, nout=None):
+def irfft(spectrum: Union[np.ndarray, List[complex]], nout=None):
     """
     Calculate the inverse Fourier transform of $spectrum, optionally
     truncating to $nout entries.
@@ -27,7 +29,7 @@ def irfft(spectrum: np.ndarray, nout=None):
     if nout is None:
         nout = 2 * (len(spectrum) - 1)
     nin = nout // 2 + 1
-    
+
     if nout_orig is None:
         assert nin == len(spectrum)
 

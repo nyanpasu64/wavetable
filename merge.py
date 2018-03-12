@@ -1,6 +1,5 @@
 from typing import List
 import itertools
-import numpy as np
 from collections import namedtuple, OrderedDict
 from global_util import *
 
@@ -10,12 +9,12 @@ from .gauss import set_range
 assert set_range
 
 
-
-def _rms(ar):
-    square = np.array(ar) ** 2
+def _rms(arr):
+    square = np.array(arr) ** 2
     mean = np.mean(square)
     root = np.sqrt(mean)
     return root
+
 
 def load_string(s):
     data = s.split(';')
@@ -38,13 +37,13 @@ def _load_waves(filename):
 
 def _merge_with(*waves: List[np.ndarray], nsamp, avg_func):
     ffts = [np.fft.rfft(wave) for wave in waves]
-    
+
     outs = []
     for coeffs in itertools.zip_longest(*ffts, fillvalue=0j):
         mag = avg_func(np.abs(coeffs))
         arg = np.mean(np.angle(coeffs))
         outs.append(mag * np.exp(1j * arg))
-    
+
     wave_out = fourier.irfft(outs, nsamp)
     return gauss.rescale_quantize(wave_out)
 
@@ -53,6 +52,7 @@ def amp_merge(*waves: List[np.ndarray], nsamp=None):
     """ Combines multiple waves[], taking the average *amplitude* of each harmonic. """
     return _merge_with(*waves, nsamp=nsamp, avg_func=np.mean)
 
+
 def power_merge(*waves: List[np.ndarray], nsamp=None):
     """ Combines multiple waves[], taking the average *power* of each harmonic. """
     return _merge_with(*waves, nsamp=nsamp, avg_func=_rms)
@@ -60,16 +60,27 @@ def power_merge(*waves: List[np.ndarray], nsamp=None):
 
 # **** packing MML strings
 
-def load_file_mml(filename, mml):
+def load_file_mml(filename, mml, vol_curve=None):
     waves = _load_waves(filename)
     inds = I(mml)
-    return waves[inds]
+    seq = waves[inds]
+
+    if vol_curve:
+        vol_curve = I(vol_curve)
+        cnt = max(len(seq), len(vol_curve))
+        seq = np.array([
+            _get(seq, i) * float(_get(vol_curve, i))
+            for i in range(cnt)
+        ])
+
+    return seq
 
 
 Instr = namedtuple('Instr', 'waveseq freq amp')
 # Partial = namedtuple('Instr', 'wave freq amp')
 
-def waveseq_get(waveseq, i):
+
+def _get(waveseq, i):
     if i >= len(waveseq):
         return waveseq[-1]
     return waveseq[i]
@@ -80,7 +91,7 @@ def _merge_harmonic(instrs: List[Instr], wave_num, nsamp):
 
     # entry[i] = [freq, amp]
     for instr in instrs:
-        wave = waveseq_get(instr.waveseq, wave_num)
+        wave = _get(instr.waveseq, wave_num)
         harmonic_wave = npcat([wave] * instr.freq) * instr.amp
         harmonic_waves.append(harmonic_wave)
 
@@ -101,6 +112,7 @@ def merge_instrs(instrs: List[Instr], nsamp):
         merged_waveseq.append(_merge_harmonic(instrs, i, nsamp))
 
     return merged_waveseq
+
 
 def combine(waveseq):
     """ Returns minimal waveseq, MML string. """
