@@ -41,7 +41,7 @@ def _merge_with(*waves: List[np.ndarray], nsamp, avg_func):
     
     outs = []
     for coeffs in itertools.zip_longest(*ffts, fillvalue=0j):
-        mag = _rms(np.abs(coeffs))
+        mag = avg_func(np.abs(coeffs))
         arg = np.mean(np.angle(coeffs))
         outs.append(mag * np.exp(1j * arg))
     
