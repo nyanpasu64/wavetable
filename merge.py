@@ -2,6 +2,7 @@ from typing import List
 import itertools
 from collections import namedtuple, OrderedDict
 from global_util import *
+from enum import Enum
 
 from wavetable import fourier
 from wavetable import gauss
@@ -10,7 +11,7 @@ from wavetable.gauss import set_range
 assert set_range
 
 
-def _rms(arr):
+def rms(arr):
     square = np.array(arr) ** 2
     mean = np.mean(square)
     root = np.sqrt(mean)
@@ -100,57 +101,80 @@ def load_file_mml(filename, mml=None, vol_curve=None):
     return merge_waves_mml(waves, mml, vol_curve)
 
 
-Instr = namedtuple('Instr', 'waveseq freq amp')
+_Instr = namedtuple('Instr', 'waveseq freq amp')
+
+
+class Instr(_Instr):
+    # TODO: incorporate volume envelopes?
+    def uniform_quantize(self, maxn):
+        q = gauss.rescale_quantize(self.waveseq, maxn)
+        print_waves(q)
+
+    def vol_quantize(self):
+        pass
+
+
+def print_waves(waveseq):
+    strs = [S(wave) for wave in waveseq]
+    print(';\n'.join(strs))
+
+
+class MergeStyle(Enum):
+    NO_PHASE = 1
+    PHASE = 2
 
 
 class Merge:
-    def _merge_waves(self, waves: List[np.ndarray], nsamp):
+    _UNITY = lambda x: x
+
+    def __init__(self,
+                 avg_func=np.mean,
+                 merge_style: MergeStyle = MergeStyle.NO_PHASE,
+                 scaling='local'):
+        self.avg_func = avg_func
+        self.merge_style = merge_style
+        self.scaling = scaling
+
+    def _merge_waves(self, waves: List[np.ndarray], nsamp, transfer):
         """ Depends on self.avg_func. """
         ffts = [np.fft.rfft(wave) for wave in waves]
 
         outs = []
-        for coeffs in itertools.zip_longest(*ffts, fillvalue=0j):
-            mag = self.avg_func(np.abs(coeffs))
-            arg = np.angle(np.mean(coeffs))
-            outs.append(mag * np.exp(1j * arg))
+        for f, coeffs in enumerate(itertools.zip_longest(*ffts, fillvalue=0j)):
+            if self.merge_style == MergeStyle.NO_PHASE:
+                mag = self.avg_func(np.abs(coeffs)) * transfer(f)
+                arg = np.angle(np.mean(coeffs))
+                outs.append(mag * np.exp(1j * arg))
+            else:
+                outs.append(np.mean(coeffs) * transfer(f))
 
         wave_out = fourier.irfft(outs, nsamp)
-        return gauss.rescale_quantize(wave_out)
+        if self.scaling == 'local':
+            return gauss.rescale_quantize(wave_out)
+        else:
+            return wave_out
 
-    # def amp_merge(self, *waves: List[np.ndarray], nsamp=None):
-    #     """ Combines multiple waves[], taking the average *amplitude* of each harmonic. """
-    #     return self._merge_with(*waves, nsamp=nsamp, avg_func=np.mean)
-    #
-    # def power_merge(self, *waves: List[np.ndarray], nsamp=None):
-    #     """ Combines multiple waves[], taking the average *power* of each harmonic. """
-    #     return self._merge_with(*waves, nsamp=nsamp, avg_func=_rms)
-
-    def _merge_instrs_idx(self, instrs: List[Instr], wave_num, nsamp):
-        # TODO: high coupling, integrate?
-        harmonic_waves = []
-
-        # entry[i] = [freq, amp]
-        for instr in instrs:
-            wave = _get(instr.waveseq, wave_num)
-            harmonic_wave = npcat([wave] * instr.freq) * instr.amp
-            harmonic_waves.append(harmonic_wave)
-
-        out = self._merge_waves(harmonic_waves, nsamp=nsamp)
-        return out
-
-    # @staticmethod
-    # def _pad_waves(waves, length):
-    #     return cat(waves, [waves[-1]] * (length - len(waves)))
-
-    def merge_instrs(self, instrs: List[Instr], nsamp):
+    def merge_instrs(self, instrs: List[Instr], nsamp, transfer=_UNITY):
         """ Pads each Instr to longest. Then merges all and returns new $waves. """
         length = max(len(instr.waveseq) for instr in instrs)
         merged_waveseq = []
 
         for i in range(length):
-            merged_waveseq.append(self._merge_instrs_idx(instrs, i, nsamp))
+            harmonic_waves = []
 
-        return merged_waveseq
+            # entry[i] = [freq, amp]
+            for instr in instrs:
+                wave = _get(instr.waveseq, i)
+                harmonic_wave = npcat([wave] * instr.freq) * instr.amp
+                harmonic_waves.append(harmonic_wave)
+
+            out = self._merge_waves(harmonic_waves, nsamp=nsamp, transfer=transfer)
+            merged_waveseq.append(out)
+
+        if self.scaling == 'global':
+            return gauss.rescale_quantize(merged_waveseq)
+        else:
+            return merged_waveseq
 
     @staticmethod
     def combine(waveseq):
@@ -174,12 +198,9 @@ class Merge:
         print()
         print()
 
-    def merge_combine(self, instrs: List[Instr], nsamp):
+    def merge_combine(self, instrs: List[Instr], nsamp, transfer=_UNITY):
         """ merge and combine into minimal wave and MML string. """
-        self.combine(self.merge_instrs(instrs, nsamp))
-
-    def __init__(self, avg_func=np.mean):
-        self.avg_func = avg_func
+        self.combine(self.merge_instrs(instrs, nsamp, transfer))
 
 
 def merge_combine(instrs: List[Instr], nsamp, avg_func=np.mean):
