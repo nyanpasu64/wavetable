@@ -1,0 +1,16 @@
+from wavetable.interact import *
+# instrument.Instrument
+# synth.synth, blend, filter
+#
+
+synth(saw) -> Inst
+
+blend([
+	synth(saw, rotate, IntSlider()),
+	synth(wtf),
+	etc
+], ) -> Inst
+
+_.filter(transfer.notch(ratio), ...)
+
+n163.Synth(4).play(_)
