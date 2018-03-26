@@ -6,7 +6,6 @@ import math
 from global_util import *
 import numpy as np
 
-
 _gauss_table = ar([
     0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000,
     0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000,
@@ -74,21 +73,19 @@ _gauss_table = ar([
     0x517, 0x518, 0x518, 0x518, 0x518, 0x518, 0x519, 0x519
 ])
 
-MAXRANGE = 16
-def set_range(maxrange):
-    global MAXRANGE
-    MAXRANGE = maxrange
-
 _gauss_table = cat(_gauss_table, _gauss_table[::-1])
 
+
 def l(x):
-    gauss = [_gauss_table[x+256*i] for i in range(4)]
+    gauss = [_gauss_table[x + 256 * i] for i in range(4)]
     total = sum(gauss)
-    return al(x/total for x in gauss)
+    return al(x / total for x in gauss)
+
 
 def normalize_filter(ys):
     total = sum(ys)
-    return al(x/total for x in ys)
+    return al(x / total for x in ys)
+
 
 # l(128)  # [58, 969, 965, 56]
 # [58, 969, 965, 56]
@@ -101,9 +98,10 @@ LOLGAUSS = normalize_filter(GAUSS ** 1.5)
 
 def circular_diff(a, n=1):
     n0 = len(a)
-    xnew = cat(a,a)
+    xnew = cat(a, a)
     ynew = np.diff(xnew, n)
     return cat(ynew[:n0])
+
 
 def circular_convolve(raw, filter):
     # Hopefully raw > filter...
@@ -127,9 +125,10 @@ def circular_convolve(raw, filter):
     l = len(conv) // 2
     hl = l // 2
 
-    out = cat(conv[l:l+hl], conv[hl:l])
+    out = cat(conv[l:l + hl], conv[hl:l])
 
     return out
+
 
 def repeatedly_convolve(raw, filter, n):
     for i in range(n):
@@ -137,10 +136,10 @@ def repeatedly_convolve(raw, filter, n):
 
     return raw
 
-a = b = [1]*10
-assert (circular_convolve(a,b) == [10]*10).all()
-assert (circular_convolve([1,2,3,4,5], [1]) == [1,2,3,4,5]).all()
 
+a = b = [1] * 10
+assert (circular_convolve(a, b) == [10] * 10).all()
+assert (circular_convolve([1, 2, 3, 4, 5], [1]) == [1, 2, 3, 4, 5]).all()
 
 
 # FORMATTING
@@ -151,53 +150,65 @@ def sprint(a, **kwargs):
 # **** SAWTOOTH ROUNDING ****
 
 def quantize(a, y=None):
-        if y is None:
-            y = math.ceil(max(a))
-        return np.minimum(a.astype(int), y-1)
+    if y is None:
+        y = math.ceil(max(a))
+    return np.minimum(a.astype(int), y - 1)
+
 
 def iround(a):
     return np.round(a).astype(int)
 
 
+class Rescaler:
+    def __init__(self, maxrange, do_round='quantize'):
+        self.maxrange = maxrange
+        self.do_round = do_round
+
+    def rescale_quantize(self, ys, ret_tuple=False):
+        maxrange = self.maxrange
+
+        if self.do_round == 'round':
+            def _quantize(ys, maxrange):
+                return iround(ys)
+
+            maxrange -= 1
+        elif self.do_round == 'quantize':
+            _quantize = quantize
+        elif self.do_round == 'skip':
+            def _quantize(ys, maxrange):
+                return ys
+        else:
+            raise ValueError('self.do_round')
+
+        ys -= np.amin(ys)
+        factor = np.amax(ys)
+        ys /= factor
+        ys *= maxrange
+
+        out = _quantize(ys, maxrange)
+        if ret_tuple:
+            return factor, out
+        else:
+            return out
+
+
 # https://stackoverflow.com/questions/1132941/least-astonishment-and-the-mutable-default-argument#comment950592_1133013
-def rescale_quantize(ys, maxrange=None, do_round='quantize', ret_tuple=False):
-    if maxrange is None:
-        maxrange = MAXRANGE
-    if do_round == 'round':
-        def _quantize(ys, maxrange):
-            return iround(ys)
-        maxrange -= 1
-    elif do_round == 'quantize':
-        _quantize = quantize
-    elif do_round == 'skip':
-        def _quantize(ys, maxrange):
-            return ys
-    else:
-        raise ValueError('do_round')
-
-    ys -= np.amin(ys)
-    factor = np.amax(ys)
-    ys /= factor
-    ys *= maxrange
-
-    out = _quantize(ys, maxrange)
-    if ret_tuple:
-        return factor, out
-    else:
-        return out
 
 
 def ei(theta):
     return np.exp(1j * theta)
 
+
 def rotate(z, theta):
     return z * np.exp(1j * theta)
 
+
 def nyquist_exclusive(n):
-    return (n+1) // 2
+    return (n + 1) // 2
+
 
 def nyquist_inclusive(n):
-    return n//2 + 1
+    return n // 2 + 1
 
 
 assert nyquist_exclusive(4) == 2
