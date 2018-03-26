@@ -6,12 +6,10 @@ from typing import List
 from global_util import *
 from numpy.fft import fft, ifft
 from wavetable import fourier
-from wavetable import gauss
 from wavetable import transfer
-from wavetable.gauss import set_range
-from wavetable.instrument import Instr
+from wavetable.gauss import Rescaler
 
-assert set_range
+from wavetable.instrument import Instr
 
 
 def rms(arr):
@@ -118,14 +116,18 @@ class MergeStyle(Enum):
     PHASE = 2
 
 
+_MAXRANGE = 16
+
+
 class Merge:
-    def __init__(self,
+    def __init__(self, maxrange,
                  avg_func=np.mean,
                  merge_style: MergeStyle = MergeStyle.NO_PHASE,
                  scaling='local'):
         self.avg_func = avg_func
         self.merge_style = merge_style
         self.scaling = scaling
+        self.rescaler = Rescaler(maxrange)
 
     def _merge_waves(self, waves: List[np.ndarray], nsamp, transfer):
         """ Depends on self.avg_func. """
@@ -142,7 +144,7 @@ class Merge:
 
         wave_out = fourier.irfft(outs, nsamp)
         if self.scaling == 'local':
-            return gauss.rescale_quantize(wave_out)
+            return self.rescaler.rescale_quantize(wave_out)
         else:
             return wave_out
 
@@ -164,7 +166,7 @@ class Merge:
             merged_waveseq.append(out)
 
         if self.scaling == 'global':
-            return gauss.rescale_quantize(merged_waveseq)
+            return self.rescaler.rescale_quantize(merged_waveseq)
         else:
             return merged_waveseq
 
@@ -194,6 +196,7 @@ class Merge:
         self.combine(self.merge_instrs(instrs, nsamp, transfer))
 
 
+# FIXME maxrange
 def merge_combine(instrs: List[Instr], nsamp, avg_func=np.mean, transfer=transfer.Unity()):
     merger = Merge(avg_func)
     merger.merge_combine(instrs, nsamp, transfer)
@@ -211,7 +214,7 @@ def correlate(fixed, sweep):
     return ifft(fft(fixed) * fft(sweep).conj()).real
 
 
-def correlate_offset(fixed, sweep):
+def correlate_offset(fixed, sweep, i=None):
     """ Get peak correlation offset. """
 
     corrs = correlate(fixed, sweep)
@@ -226,7 +229,7 @@ def align_waves(waveseq):
     """ Returns maximum-correlation copy of waveseq. """
     out = [waveseq[0]]
     for i, wave in enumerate(waveseq[1:], 1):
-        offset = correlate_offset(out[-1], wave)
+        offset = correlate_offset(out[-1], wave, i)
         out.append(np.roll(wave, offset))
 
     return out
