@@ -34,6 +34,20 @@ def test_merge_waves_mml():
             ).all
 
 
+def test_correlate():
+    fixed = F('0 0 1 2 0 0')
+    sweep = F('0 0 1 2 0 0')
+    N = len(sweep)
+
+    assert correlate_offset(fixed, sweep) == 0
+
+    sweep = F('0 0 0 1 2 0')
+    offset = correlate_offset(fixed, sweep)
+    assert offset == N - 1
+
+    assert (np.roll(sweep, offset) == fixed).all()
+
+
 if __name__ == '__main__':
     import py
 

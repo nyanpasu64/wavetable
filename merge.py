@@ -4,6 +4,7 @@ from enum import Enum
 from typing import List
 
 from global_util import *
+from numpy.fft import fft, ifft
 from wavetable import fourier
 from wavetable import gauss
 from wavetable import transfer
@@ -118,17 +119,15 @@ class Instr(_Instr):
 def print_waves(waveseq):
     strs = [S(wave) for wave in waveseq]
     print(';\n'.join(strs))
+    print()
+
+
+print_waveseq = print_waves
 
 
 class MergeStyle(Enum):
     NO_PHASE = 1
     PHASE = 2
-
-
-def print_waveseq(waveseq):
-    strings = [S(wave) for wave in waveseq]
-    print(';\n'.join(strings))
-    print()
 
 
 class Merge:
@@ -210,3 +209,36 @@ class Merge:
 def merge_combine(instrs: List[Instr], nsamp, avg_func=np.mean, transfer=transfer.Unity()):
     merger = Merge(avg_func)
     merger.merge_combine(instrs, nsamp, transfer)
+
+
+# Correlation
+
+def correlate(fixed, sweep):
+    """ circular cross-correlation of 2 equal waves """
+    fixed = np.array(fixed)
+    sweep = np.array(sweep)
+    if fixed.shape != sweep.shape or len(fixed.shape) != 1:
+        raise ValueError('incorrect dimensions: %s versus %s' % (fixed.shape, sweep.shape))
+
+    return ifft(fft(fixed) * fft(sweep).conj()).real
+
+
+def correlate_offset(fixed, sweep):
+    """ Get peak correlation offset. """
+
+    corrs = correlate(fixed, sweep)
+    if np.argmax(abs(corrs)) != np.argmax(corrs):
+        raise ValueError(f'yeah, seems like you need to invert wave {i}')
+
+    offset = np.argmax(corrs)
+    return offset
+
+
+def align_waves(waveseq):
+    """ Returns maximum-correlation copy of waveseq. """
+    out = [waveseq[0]]
+    for i, wave in enumerate(waveseq[1:], 1):
+        offset = correlate_offset(out[-1], wave)
+        out.append(np.roll(wave, offset))
+
+    return out
