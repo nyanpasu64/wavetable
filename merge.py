@@ -1,5 +1,5 @@
 import itertools
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 from enum import Enum
 from typing import List
 
@@ -9,6 +9,7 @@ from wavetable import fourier
 from wavetable import gauss
 from wavetable import transfer
 from wavetable.gauss import set_range
+from wavetable.instrument import Instr
 
 assert set_range
 
@@ -101,19 +102,6 @@ def load_file_mml(filename, mml=None, vol_curve=None):
     """
     waves = _load_waves(filename)
     return merge_waves_mml(waves, mml, vol_curve)
-
-
-_Instr = namedtuple('Instr', 'waveseq freq amp')
-
-
-class Instr(_Instr):
-    # TODO: incorporate volume envelopes?
-    def uniform_quantize(self, maxn):
-        q = gauss.rescale_quantize(self.waveseq, maxn)
-        print_waves(q)
-
-    def vol_quantize(self):
-        pass
 
 
 def print_waves(waveseq):
