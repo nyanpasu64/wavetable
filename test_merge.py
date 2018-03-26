@@ -31,7 +31,7 @@ def test_merge_waves_mml():
                       [0., 2., 6., 12.],
                       [0., 1., 2., 3.],
                       [0., 1., 3., 6.]])
-            ).all
+            ).all()
 
 
 def test_correlate():
