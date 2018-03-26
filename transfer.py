@@ -20,8 +20,8 @@ class LowF(TransferFunctor):
     def __call__(self, omega):
         if omega < self.omega0:
             return self.y * 1.0
-        elif omega == self.omega0:
-            return (1 + self.y) / 2.0
+        # elif omega == self.omega0:
+        #     return (1 + self.y) / 2.0
         else:
             return 1.0
 
@@ -32,10 +32,10 @@ class HighF(TransferFunctor):
         self.y = y
 
     def __call__(self, omega):
-        if omega < self.omega0:
+        if omega > self.omega0:
             return self.y * 1.0
-        elif omega == self.omega0:
-            return (1 + self.y) / 2.0
+        # elif omega == self.omega0:
+        #     return (1 + self.y) / 2.0
         else:
             return 1.0
 
@@ -49,10 +49,15 @@ class BandF(TransferFunctor):
     def __call__(self, omega):
         if self.omegaL < omega < self.omegaR:
             return self.y * 1.0
-        elif omega in [self.omegaL, self.omegaR]:
-            return (1 + self.y) / 2.0
+        # elif omega in [self.omegaL, self.omegaR]:
+        #     return (1 + self.y) / 2.0
         else:
             return 1.0
+
+
+class Unity(TransferFunctor):
+    def __call__(self, omega):
+        return 1
 
 
 def BandF2(omegaL, omegaR, y):

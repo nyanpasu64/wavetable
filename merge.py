@@ -1,11 +1,12 @@
-from typing import List
 import itertools
 from collections import namedtuple, OrderedDict
-from global_util import *
 from enum import Enum
+from typing import List
 
+from global_util import *
 from wavetable import fourier
 from wavetable import gauss
+from wavetable import transfer
 from wavetable.gauss import set_range
 
 assert set_range
@@ -124,9 +125,13 @@ class MergeStyle(Enum):
     PHASE = 2
 
 
-class Merge:
-    _UNITY = lambda x: x
+def print_waveseq(waveseq):
+    strings = [S(wave) for wave in waveseq]
+    print(';\n'.join(strings))
+    print()
 
+
+class Merge:
     def __init__(self,
                  avg_func=np.mean,
                  merge_style: MergeStyle = MergeStyle.NO_PHASE,
@@ -154,7 +159,7 @@ class Merge:
         else:
             return wave_out
 
-    def merge_instrs(self, instrs: List[Instr], nsamp, transfer=_UNITY):
+    def merge_instrs(self, instrs: List[Instr], nsamp, transfer=transfer.Unity()):
         """ Pads each Instr to longest. Then merges all and returns new $waves. """
         length = max(len(instr.waveseq) for instr in instrs)
         merged_waveseq = []
@@ -191,18 +196,17 @@ class Merge:
                 curr_idx += 1
             mml.append(wave2idx[wave])
 
-        minimal_waveseq = [S(wave) for wave in wave2idx.keys()]
-        print(';\n'.join(minimal_waveseq))
-        print()
+        minimal_waveseq = list(wave2idx.keys())
+        print_waveseq(minimal_waveseq)
         print(S(mml))
         print()
         print()
 
-    def merge_combine(self, instrs: List[Instr], nsamp, transfer=_UNITY):
+    def merge_combine(self, instrs: List[Instr], nsamp, transfer=transfer.Unity()):
         """ merge and combine into minimal wave and MML string. """
         self.combine(self.merge_instrs(instrs, nsamp, transfer))
 
 
-def merge_combine(instrs: List[Instr], nsamp, avg_func=np.mean):
+def merge_combine(instrs: List[Instr], nsamp, avg_func=np.mean, transfer=transfer.Unity()):
     merger = Merge(avg_func)
-    merger.merge_combine(instrs, nsamp)
+    merger.merge_combine(instrs, nsamp, transfer)

@@ -34,7 +34,3 @@ def saw_waves(N):
     return waves
 
 
-def roll_ax_b(N, wave, a, b):
-    waves = [np.roll(wave, a * i + b)
-             for i in range(N)]
-    return waves
