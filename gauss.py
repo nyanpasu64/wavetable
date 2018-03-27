@@ -160,9 +160,13 @@ def iround(a):
 
 
 class Rescaler:
+    # TODO: methods: rescale with volume, rescale without volume.
     def __init__(self, maxrange, do_round='quantize'):
         self.maxrange = maxrange
         self.do_round = do_round
+
+    def __call__(self, ys, ret_tuple=False):
+        return self.rescale_quantize(ys, ret_tuple)
 
     def rescale_quantize(self, ys, ret_tuple=False):
         maxrange = self.maxrange
