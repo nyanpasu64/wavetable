@@ -1,9 +1,13 @@
 import math
+from numbers import Number
+from typing import Optional, List, Tuple, Sequence
 
 import numpy as np
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr
 from wavetable import gauss
+from wavetable.gauss import Rescaler
+from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
 
 import fourier
@@ -12,8 +16,7 @@ from util import AttrDict
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 np.loge = np.ln = np.log
 
-_FPS = 60
-FRAME_TIME = 1.0 / _FPS
+DEFAULT_FPS = 60
 
 
 def freq_from_fft_limited(signal, *, end):
@@ -45,16 +48,20 @@ class WaveReader:
         self.wav = self.wav.astype(float)
         self.freq_estimate = pitch2freq(cfg.pitch_estimate)
 
-        self.range = cfg.range
+        self.range = cfg.range  # type: Optional[int]
+        if self.range:
+            self.rescaler = Rescaler(self.range)
+
         self.nsamp = cfg.nsamp
         self.nwave = cfg.get('nwave', None)
-        self.fps = cfg.get('fps', _FPS)
+        self.fps = cfg.get('fps', DEFAULT_FPS)
+        self.frame_time = 1 / self.fps
         self.offset = cfg.get('offset', 0.5)
 
         self.mode = cfg.get('mode', 'stft')
         if self.mode == 'stft':
             # Maximum of 1/60th second or 2 periods
-            segment_time = max(FRAME_TIME, 2 / self.freq_estimate)
+            segment_time = max(self.frame_time, 2 / self.freq_estimate)
             self.segment_smp = self.s_t(segment_time)
             self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))    # type: int
 
@@ -65,15 +72,17 @@ class WaveReader:
         return int(time * self.sr)
 
     def t_f(self, frame):
-        return frame * FRAME_TIME
+        return frame * self.frame_time
 
     def f_t(self, time):
-        return int(time / FRAME_TIME)
+        return int(time / self.frame_time)
 
     def t_s(self, sample):
         return sample / self.sr
 
     def raw_at(self, sample_offset):
+        if sample_offset + self.segment_smp >= len(self.wav):
+            sample_offset = len(self.wav) - self.segment_smp
         data = self.wav[sample_offset:sample_offset + self.segment_smp]     # type: np.ndarray
         return data.copy()
 
@@ -84,7 +93,7 @@ class WaveReader:
         phased_data = np.roll(data, len(data)//2)
         return np.fft.rfft(phased_data)
 
-    def wave_at(self, sample_offset):
+    def wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float]:
         if self.mode == 'stft':
             # Get STFT. Extract ~~power~~ from bins into new waveform's Fourier buffer.
 
@@ -102,13 +111,28 @@ class WaveReader:
                 end = freq * (harmonic + 0.5)
                 # print(begin, end)
                 bands = stft[math.ceil(begin):math.ceil(end)]
+                # FIXME calculate power
                 result_fft.append(np.sum(bands))
 
-            return fourier.irfft(result_fft)
+            wave = fourier.irfft(result_fft)
+            if self.range:
+                wave = self.rescaler(wave)
+            return wave, freq
 
+    def read(self, start: int=1):
+        """ For each frame, extract wave_at. """
+        frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
+        start_samp = start * frame_dsamp
+        stop_samp = (start + self.nwave) * frame_dsamp  # len(self.wav)
+        sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
+        return self.read_at(sample_offsets)
 
-    def read(self):
-        return Instr()
-#         inds = range()
-#         for sample_offset in np.arange(0, )
-#         self.wave_at()
+    def read_at(self, sample_offsets: Sequence):
+        waveseq = []
+        freqs = []
+        # TODO vols = []
+        for offset in sample_offsets:
+            wave, freq = self.wave_at(offset)
+            waveseq.append(wave)
+            freqs.append(freq)
+        return Instr(waveseq, AttrDict(freqs=freqs))

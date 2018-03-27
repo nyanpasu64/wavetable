@@ -9,7 +9,7 @@ from wavetable import fourier
 from wavetable import transfer
 from wavetable.gauss import Rescaler
 
-from wavetable.instrument import Instr
+from wavetable.instrument import MergeInstr
 
 
 def rms(arr):
@@ -148,8 +148,8 @@ class Merge:
         else:
             return wave_out
 
-    def merge_instrs(self, instrs: List[Instr], nsamp, transfer=transfer.Unity()):
-        """ Pads each Instr to longest. Then merges all and returns new $waves. """
+    def merge_instrs(self, instrs: List[MergeInstr], nsamp, transfer=transfer.Unity()):
+        """ Pads each MergeInstr to longest. Then merges all and returns new $waves. """
         length = max(len(instr.waveseq) for instr in instrs)
         merged_waveseq = []
 
@@ -191,13 +191,13 @@ class Merge:
         print()
         print()
 
-    def merge_combine(self, instrs: List[Instr], nsamp, transfer=transfer.Unity()):
+    def merge_combine(self, instrs: List[MergeInstr], nsamp, transfer=transfer.Unity()):
         """ merge and combine into minimal wave and MML string. """
         self.combine(self.merge_instrs(instrs, nsamp, transfer))
 
 
 # FIXME maxrange
-def merge_combine(instrs: List[Instr], nsamp, avg_func=np.mean, transfer=transfer.Unity()):
+def merge_combine(instrs: List[MergeInstr], nsamp, avg_func=np.mean, transfer=transfer.Unity()):
     merger = Merge(avg_func)
     merger.merge_combine(instrs, nsamp, transfer)
 

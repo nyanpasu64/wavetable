@@ -24,7 +24,7 @@ cfg = AttrDict(
 
 def test_wave_at():
     read = WaveReader(PATH, cfg)
-    wave = read.wave_at(0)
+    wave, _freq = read.wave_at(0)
     assert not (wave == wave[0]).all()
 
 
