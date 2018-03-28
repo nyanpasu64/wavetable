@@ -15,6 +15,7 @@ NWAVE = 30
 
 cfg = AttrDict(
     range=MAX_RANGE,
+    vol_range=16,
     nsamp=NSAMP,
     nwave=NWAVE,
     fps=60,
@@ -24,7 +25,7 @@ cfg = AttrDict(
 
 def test_wave_at():
     read = WaveReader(PATH, cfg)
-    wave, _freq = read.wave_at(0)
+    wave, *_ = read.wave_at(0)
     assert not (wave == wave[0]).all()
 
 
@@ -46,3 +47,11 @@ def test_read_at():
 
     waveseq = instr.waveseq
     assert len(waveseq) == len(inds)
+
+
+def test_reader_instr():
+    read = WaveReader(PATH, cfg)
+    instr = read.read()
+    assert isinstance(instr, Instr)
+
+    instr.print(2, True)

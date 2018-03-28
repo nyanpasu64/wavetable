@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from numpy.fft import ifft, fft
 
@@ -66,3 +67,74 @@ def align_waves(waveseq):
         out.append(np.roll(wave, offset))
 
     return out
+
+
+# Rescaler
+
+def quantize(a, y=None):
+    if y is None:
+        y = math.ceil(max(a))
+    return np.minimum(a.astype(int), y - 1)
+
+
+def iround(a):
+    return np.round(a).astype(int)
+
+class Rescaler:
+    def __init__(self, maxrange, rounding='quantize', translate=True):
+        self.max_range = maxrange
+        self.rounding = rounding
+        self.translate = translate
+
+    # def __call__(self, ys):
+    #     return self.rescale_quantize(ys, ret_tuple)
+
+    def rescale_peak(self, ys: np.ndarray):
+        """
+        :param ys: waveform
+        :return: (rescaled waveform, peak amplitude)
+        """
+        max_range = self.max_range
+
+        if self.rounding == 'round':
+            def _quantize(ys, _):
+                return iround(ys)
+
+            max_range -= 1
+
+        elif self.rounding == 'quantize':
+            _quantize = quantize
+        elif self.rounding == 'skip':
+            def _quantize(ys, _):
+                return ys
+        else:
+            raise ValueError('self.do_round')
+
+        if self.translate:
+            ys -= np.amin(ys)
+        peak = np.amax(ys)
+        ys /= peak
+        ys *= max_range
+
+        out = _quantize(ys, max_range)
+        return out, peak
+
+    def rescale(self, ys):
+        return self.rescale_peak(ys)[0]
+
+
+def pitch2freq(pitch: int):
+    freq = 440 * 2 ** ((pitch - 69) / 12)
+    return freq
+
+
+TICKS_PER_SEMITONE = 32
+
+
+def freq2pitch(freq: float):
+    float_pitch = 12 * (np.log(freq / 440) / np.log(2)) + 69
+    pitch = int(round(float_pitch))
+    dpitch = float_pitch - pitch
+    dticks = int(round(dpitch * TICKS_PER_SEMITONE))
+
+    return pitch, dticks

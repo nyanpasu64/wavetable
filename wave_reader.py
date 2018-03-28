@@ -1,18 +1,16 @@
 import math
 import warnings
-from typing import Optional, List, Tuple, Sequence
+from typing import Optional, Tuple, Sequence
 
 import numpy as np
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr
+from wavetable import fourier
 from wavetable import gauss
-from wavetable.gauss import Rescaler
+from wavetable import wave_util
 from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
-
-import fourier
-import wave_util
-from wave_util import AttrDict
+from wavetable.wave_util import AttrDict, Rescaler
 
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 np.loge = np.ln = np.log
@@ -53,10 +51,6 @@ class WaveReader:
         self.wav = self.wav.astype(float)
         self.freq_estimate = pitch2freq(cfg.pitch_estimate)
 
-        self.range = cfg.range  # type: Optional[int]
-        if self.range:
-            self.rescaler = Rescaler(self.range)
-
         self.nsamp = cfg.nsamp
         self.nwave = cfg.get('nwave', None)
         self.fps = cfg.get('fps', DEFAULT_FPS)
@@ -74,6 +68,14 @@ class WaveReader:
             self.power_sum = wave_util.power_merge
         else:
             raise NotImplementedError('only stft supported')
+
+        self.range = cfg.range  # type: Optional[int]
+        if self.range:
+            self.rescaler = Rescaler(self.range)
+
+        self.vol_range = cfg.get('vol_range', None)
+        if self.vol_range:
+            self.vol_rescaler = Rescaler(self.vol_range, translate=False)
 
     def s_t(self, time):
         return int(time * self.sr)
@@ -100,7 +102,12 @@ class WaveReader:
         phased_data = np.roll(data, len(data)//2)
         return np.fft.rfft(phased_data)
 
-    def wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float]:
+    def wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
+        """
+        :param sample_offset: offset
+        :return: (wave, freq, volume)
+        """
+
         if self.mode == 'stft':
             # Get STFT. Extract ~~power~~ from bins into new waveform's Fourier buffer.
 
@@ -108,14 +115,14 @@ class WaveReader:
             stft = self.stft(sample_offset)
 
             approx_freq = freq_from_autocorr(data, len(data)) # = self.freq_estimate
-            freq = freq_from_fft_limited(data, end=1.5*approx_freq)
+            freq_bin = freq_from_fft_limited(data, end=1.5*approx_freq)
 
             result_fft = []
 
             for harmonic in range(gauss.nyquist_inclusive(self.nsamp)):
                 # print(harmonic)
-                begin = freq * (harmonic - 0.5)
-                end = freq * (harmonic + 0.5)
+                begin = freq_bin * (harmonic - 0.5)
+                end = freq_bin * (harmonic + 0.5)
                 # print(begin, end)
                 bands = stft[math.ceil(begin):math.ceil(end)]
                 amplitude = self.power_sum(bands)
@@ -123,8 +130,13 @@ class WaveReader:
 
             wave = fourier.irfft(result_fft)
             if self.range:
-                wave = self.rescaler(wave)
-            return wave, freq
+                wave, peak = self.rescaler.rescale_peak(wave)
+            else:
+                peak = 1
+
+            freq_hz = freq_bin / len(data) * self.sr
+
+            return wave, freq_hz, peak
 
     def read(self, start: int=1):
         """ For each frame, extract wave_at. """
@@ -139,11 +151,30 @@ class WaveReader:
         return self.read_at(sample_offsets)
 
     def read_at(self, sample_offsets: Sequence):
-        waveseq = []
+        wave_seq = []
         freqs = []
-        # TODO vols = []
+        vols = []
         for offset in sample_offsets:
-            wave, freq = self.wave_at(offset)
-            waveseq.append(wave)
+            wave, freq, peak = self.wave_at(offset)
+            wave_seq.append(wave)
             freqs.append(freq)
-        return Instr(waveseq, AttrDict(freqs=freqs))
+            vols.append(peak)
+
+        wave_seq = wave_util.align_waves(wave_seq)
+        if self.vol_range:
+            vols = self.vol_rescaler.rescale(vols)
+        return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
+
+
+def n163_cfg():
+    return AttrDict(
+        range=16,
+        vol_range=16
+    )
+
+
+def unrounded_cfg():
+    return AttrDict(
+        range=None,
+        vol_range=None
+    )
