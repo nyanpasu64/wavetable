@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 
-from util import AttrDict
+from wave_util import AttrDict
 
 
 class MergeInstr:  # (_Instr):
