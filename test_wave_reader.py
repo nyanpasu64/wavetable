@@ -2,7 +2,7 @@ import py.test
 import pytest
 from wavetable.instrument import Instr
 
-from util import AttrDict
+from wave_util import AttrDict
 from wave_reader import WaveReader
 
 assert py.test

@@ -1,5 +1,5 @@
 import math
-from numbers import Number
+import warnings
 from typing import Optional, List, Tuple, Sequence
 
 import numpy as np
@@ -11,7 +11,8 @@ from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
 
 import fourier
-from util import AttrDict
+import wave_util
+from wave_util import AttrDict
 
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 np.loge = np.ln = np.log
@@ -44,7 +45,11 @@ def freq_from_fft_limited(signal, *, end):
 class WaveReader:
     def __init__(self, path, cfg: AttrDict):
         self.path = path
-        self.sr, self.wav = wavfile.read(path)    # type: int, np.ndarray
+        with warnings.catch_warnings():
+            # Polyphone SF2 rips contain 'smpl' chunk with loop data
+            warnings.simplefilter("ignore")
+            self.sr, self.wav = wavfile.read(path)    # type: int, np.ndarray
+
         self.wav = self.wav.astype(float)
         self.freq_estimate = pitch2freq(cfg.pitch_estimate)
 
@@ -65,8 +70,10 @@ class WaveReader:
             self.segment_smp = self.s_t(segment_time)
             self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))    # type: int
 
-            # self.stft = stfu(self.wav, fs=self.sr, nperseg=self.segment_smp, boundary=None)
             self.window = np.hanning(self.segment_smp)
+            self.power_sum = wave_util.power_merge
+        else:
+            raise NotImplementedError('only stft supported')
 
     def s_t(self, time):
         return int(time * self.sr)
@@ -111,8 +118,8 @@ class WaveReader:
                 end = freq * (harmonic + 0.5)
                 # print(begin, end)
                 bands = stft[math.ceil(begin):math.ceil(end)]
-                # FIXME calculate power
-                result_fft.append(np.sum(bands))
+                amplitude = self.power_sum(bands)
+                result_fft.append(amplitude)
 
             wave = fourier.irfft(result_fft)
             if self.range:
@@ -123,7 +130,11 @@ class WaveReader:
         """ For each frame, extract wave_at. """
         frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
         start_samp = start * frame_dsamp
-        stop_samp = (start + self.nwave) * frame_dsamp  # len(self.wav)
+        if self.nwave:
+            stop_samp = (start + self.nwave) * frame_dsamp
+        else:
+            stop_samp = len(self.wav)
+
         sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
         return self.read_at(sample_offsets)
 

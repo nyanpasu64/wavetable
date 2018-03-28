@@ -4,19 +4,13 @@ from enum import Enum
 from typing import List
 
 from global_util import *
-from numpy.fft import fft, ifft
 from wavetable import fourier
 from wavetable import transfer
 from wavetable.gauss import Rescaler
 
 from wavetable.instrument import MergeInstr
 
-
-def rms(arr):
-    square = np.array(arr) ** 2
-    mean = np.mean(square)
-    root = np.sqrt(mean)
-    return root
+import wave_util
 
 
 def load_string(s):
@@ -112,20 +106,26 @@ print_waveseq = print_waves
 
 
 class MergeStyle(Enum):
-    NO_PHASE = 1
-    PHASE = 2
+    POWER = 1
+    AMPLITUDE = 2
+    SUM = 3
 
 
 _MAXRANGE = 16
 
 
 class Merge:
+    merge_funcs = {
+        MergeStyle.POWER: wave_util.power_merge,
+        MergeStyle.AMPLITUDE: wave_util.amplitude_merge,
+        MergeStyle.SUM: wave_util.sum_merge
+    }
+
     def __init__(self, maxrange,
-                 avg_func=np.mean,
-                 merge_style: MergeStyle = MergeStyle.NO_PHASE,
+                 merge_style: MergeStyle = MergeStyle.POWER,
                  scaling='local'):
-        self.avg_func = avg_func
-        self.merge_style = merge_style
+
+        self.phasor_merger = self.merge_funcs[merge_style]
         self.scaling = scaling
         self.rescaler = Rescaler(maxrange)
 
@@ -134,13 +134,8 @@ class Merge:
         ffts = [np.fft.rfft(wave) for wave in waves]
 
         outs = []
-        for f, coeffs in enumerate(itertools.zip_longest(*ffts, fillvalue=0j)):
-            if self.merge_style == MergeStyle.NO_PHASE:
-                mag = self.avg_func(np.abs(coeffs)) * transfer(f)
-                arg = np.angle(np.mean(coeffs))
-                outs.append(mag * np.exp(1j * arg))
-            else:
-                outs.append(np.mean(coeffs) * transfer(f))
+        for f, phasors in enumerate(itertools.zip_longest(*ffts, fillvalue=0j)):
+            outs.append(self.phasor_merger(phasors) * transfer(f))
 
         wave_out = fourier.irfft(outs, nsamp)
         if self.scaling == 'local':
@@ -153,12 +148,12 @@ class Merge:
         length = max(len(instr.waveseq) for instr in instrs)
         merged_waveseq = []
 
-        for i in range(length):
+        for wave_idx in range(length):
             harmonic_waves = []
 
-            # entry[i] = [freq, amp]
+            # entry[wave_idx] = [freq, amp]
             for instr in instrs:
-                wave = _get(instr.waveseq, i)
+                wave = _get(instr.waveseq, wave_idx)
                 harmonic_wave = npcat([wave] * instr.freq) * instr.amp
                 harmonic_waves.append(harmonic_wave)
 
@@ -200,36 +195,3 @@ class Merge:
 def merge_combine(instrs: List[MergeInstr], nsamp, avg_func=np.mean, transfer=transfer.Unity()):
     merger = Merge(avg_func)
     merger.merge_combine(instrs, nsamp, transfer)
-
-
-# Correlation
-
-def correlate(fixed, sweep):
-    """ circular cross-correlation of 2 equal waves """
-    fixed = np.array(fixed)
-    sweep = np.array(sweep)
-    if fixed.shape != sweep.shape or len(fixed.shape) != 1:
-        raise ValueError('incorrect dimensions: %s versus %s' % (fixed.shape, sweep.shape))
-
-    return ifft(fft(fixed) * fft(sweep).conj()).real
-
-
-def correlate_offset(fixed, sweep, i=None):
-    """ Get peak correlation offset. """
-
-    corrs = correlate(fixed, sweep)
-    if np.argmax(abs(corrs)) != np.argmax(corrs):
-        raise ValueError(f'yeah, seems like you need to invert wave {i}')
-
-    offset = np.argmax(corrs)
-    return offset
-
-
-def align_waves(waveseq):
-    """ Returns maximum-correlation copy of waveseq. """
-    out = [waveseq[0]]
-    for i, wave in enumerate(waveseq[1:], 1):
-        offset = correlate_offset(out[-1], wave, i)
-        out.append(np.roll(wave, offset))
-
-    return out

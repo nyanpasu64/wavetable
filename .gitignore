@@ -162,3 +162,5 @@ fabric.properties
 
 
 .idea
+
+*.ipynb
