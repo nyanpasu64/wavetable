@@ -3,15 +3,11 @@ from collections import namedtuple
 
 import numpy as np
 
+from wavetable.wave_util import pitch2freq
+
 CPU_NTSC = 1.79e6
 FPS = 60
 FRAME_TIME = 1.0/FPS
-
-
-def pitch2freq(pitch):
-    freq = 440 * 2 ** ((pitch - 69) / 12)
-    return freq
-
 
 _note = namedtuple('note', 'waveseq vol pitch')
 class Note(_note):

@@ -147,57 +147,6 @@ def sprint(a, **kwargs):
     print(S(a), **kwargs)
 
 
-# **** SAWTOOTH ROUNDING ****
-
-def quantize(a, y=None):
-    if y is None:
-        y = math.ceil(max(a))
-    return np.minimum(a.astype(int), y - 1)
-
-
-def iround(a):
-    return np.round(a).astype(int)
-
-
-class Rescaler:
-    # TODO: methods: rescale with volume, rescale without volume.
-    def __init__(self, maxrange, do_round='quantize'):
-        self.maxrange = maxrange
-        self.do_round = do_round
-
-    def __call__(self, ys, ret_tuple=False):
-        return self.rescale_quantize(ys, ret_tuple)
-
-    def rescale_quantize(self, ys, ret_tuple=False):
-        maxrange = self.maxrange
-
-        if self.do_round == 'round':
-            def _quantize(ys, maxrange):
-                return iround(ys)
-
-            maxrange -= 1
-        elif self.do_round == 'quantize':
-            _quantize = quantize
-        elif self.do_round == 'skip':
-            def _quantize(ys, maxrange):
-                return ys
-        else:
-            raise ValueError('self.do_round')
-
-        ys -= np.amin(ys)
-        factor = np.amax(ys)
-        ys /= factor
-        ys *= maxrange
-
-        out = _quantize(ys, maxrange)
-        if ret_tuple:
-            return factor, out
-        else:
-            return out
-
-
-# https://stackoverflow.com/questions/1132941/least-astonishment-and-the-mutable-default-argument#comment950592_1133013
-
 
 def ei(theta):
     return np.exp(1j * theta)

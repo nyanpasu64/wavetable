@@ -3,7 +3,12 @@ from typing import List
 
 import numpy as np
 
-from wave_util import AttrDict
+from wavetable.wave_util import AttrDict, freq2pitch
+
+
+def S(a, sep=' '):
+    return sep.join(str(x) for x in a)
+
 
 
 class MergeInstr:  # (_Instr):
@@ -22,6 +27,43 @@ class Instr:
         self.wave_inds = cfg.get('wave_inds', None)
         self.vols = cfg.get('vols', None)
         self.freqs = cfg.get('freqs', None)
+
+    def print_waves(self):
+        strs = [S(wave) for wave in self.waveseq]
+        print(';\n'.join(strs))
+        print()
+
+        wave_inds = self.wave_inds
+        if wave_inds is None:
+            wave_inds = list(range(len(self.waveseq)))
+        print(S(wave_inds))
+        print()
+
+    def print_freqs(self, tranpose_factor=1, fixed=False):
+        arpeggio, pitch = zip(*[freq2pitch(freq * tranpose_factor) for freq in self.freqs])
+        if not fixed:
+            arpeggio = [entry - arpeggio[0] for entry in arpeggio]
+
+        if any(entry != arpeggio[0] for entry in arpeggio):
+            print('arpeggio')
+            print(S(arpeggio))
+            print()
+
+        print('pitch')
+        print(S(pitch))
+        print()
+
+    def print(self, tranpose_factor=1, fixed=False):
+        self.print_waves()
+
+        if self.vols is not None:
+            print('vols:')
+            print(S(self.vols))
+            print()
+
+        if self.freqs is not None:
+            self.print_freqs(tranpose_factor, fixed)
+
 
 
 # def _get(seq, i):

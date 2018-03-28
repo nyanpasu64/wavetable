@@ -6,9 +6,8 @@ from typing import List
 from global_util import *
 from wavetable import fourier
 from wavetable import transfer
-from wavetable.gauss import Rescaler
-
 from wavetable.instrument import MergeInstr
+from wavetable.wave_util import Rescaler
 
 import wave_util
 
