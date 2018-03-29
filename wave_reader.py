@@ -34,10 +34,11 @@ def freq_from_fft_limited(signal, *, end):
     i_peak = argmax(abs(f))  # Just use this value for less-accurate result
     # print(abs(f))
     # print(i_peak)
-    i_interp = parabolic(log(abs(f)), i_peak)[0]
-    # print(i_interp)
-
-    return i_interp
+    try:
+        i_interp = parabolic(log(abs(f)), i_peak)[0]
+        return i_interp
+    except IndexError:
+        return float(i_peak)
 
 
 class WaveReader:
