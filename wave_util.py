@@ -131,10 +131,16 @@ def pitch2freq(pitch: int):
 TICKS_PER_SEMITONE = 32
 
 
-def freq2pitch(freq: float):
-    float_pitch = 12 * (np.log(freq / 440) / np.log(2)) + 69
-    pitch = int(round(float_pitch))
-    dpitch = float_pitch - pitch
-    dticks = int(round(dpitch * TICKS_PER_SEMITONE))
+def freq2pitch(freq: float, reference: int):
+    float_pitch = 12 * (np.log(freq / 440) / np.log(2)) + 69 - reference
+    linear_pitch = int(round(float_pitch * TICKS_PER_SEMITONE))
+    return linear_pitch
 
-    return pitch, dticks
+
+def freq2note_pitch(freq: float):
+    float_pitch = 12 * (np.log(freq / 440) / np.log(2)) + 69
+    note = int(round(float_pitch))
+    dpitch = float_pitch - note
+    linear_pitch = int(round(dpitch * TICKS_PER_SEMITONE))
+
+    return note, linear_pitch
