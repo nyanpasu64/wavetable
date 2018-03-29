@@ -39,21 +39,13 @@ class Instr:
         print(S(wave_inds))
         print()
 
-    def print_freqs(self, tranpose_factor=1, fixed=False):
-        arpeggio, pitch = zip(*[freq2pitch(freq * tranpose_factor) for freq in self.freqs])
-        if not fixed:
-            arpeggio = [entry - arpeggio[0] for entry in arpeggio]
-
-        if any(entry != arpeggio[0] for entry in arpeggio):
-            print('arpeggio')
-            print(S(arpeggio))
-            print()
-
+    def print_freqs(self, note, tranpose_factor=1):
+        pitch = [freq2pitch(freq * tranpose_factor, note) for freq in self.freqs]
         print('pitch')
         print(S(pitch))
         print()
 
-    def print(self, tranpose_factor=1, fixed=False):
+    def print(self, *args):
         self.print_waves()
 
         if self.vols is not None:
@@ -62,7 +54,7 @@ class Instr:
             print()
 
         if self.freqs is not None:
-            self.print_freqs(tranpose_factor, fixed)
+            self.print_freqs(*args)
 
 
 
