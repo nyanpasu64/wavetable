@@ -48,6 +48,8 @@ class WaveReader:
             # Polyphone SF2 rips contain 'smpl' chunk with loop data
             warnings.simplefilter("ignore")
             self.sr, self.wav = wavfile.read(path)    # type: int, np.ndarray
+            if self.wav.ndim > 1:
+                self.wav = self.wav[:, 0]
 
         self.wav = self.wav.astype(float)
         self.freq_estimate = pitch2freq(cfg.pitch_estimate)
