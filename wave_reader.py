@@ -1,13 +1,14 @@
 import math
 import warnings
 from contextlib import redirect_stdout
-from typing import Optional, Tuple, Sequence
+from typing import Tuple, Sequence  # Optional
+from numbers import Number
 import sys
 
 import numpy as np
 from ruamel.yaml import YAML
 from scipy.io import wavfile
-from waveform_analysis.freq_estimation import freq_from_autocorr
+from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
 from wavetable import fourier
 from wavetable import gauss
 from wavetable import wave_util
@@ -22,7 +23,7 @@ DEFAULT_FPS = 60
 
 
 # TODO freq = fft / round(fft/autocorr)
-def freq_from_fft_limited(signal, *, end):
+def freq_from_fft_limited(signal, *, end: Number):
     from waveform_analysis._common import parabolic
     from numpy.fft import rfft
     from numpy import argmax, log
@@ -123,9 +124,18 @@ class WaveReader:
             data = self.raw_at(sample_offset)
             stft = self.stft(sample_offset)
 
-            approx_freq = freq_from_autocorr(data, len(data)) # = self.freq_estimate
-            freq_bin = freq_from_fft_limited(data, end=1.5*approx_freq)
+            # Autocorrelation is imprecise.
+            # FFT produces a multiple of the true frequency.
+            # So use a subharmonic of FFT frequency.
 
+            approx_freq = freq_from_autocorr(data, len(data)) # = self.freq_estimate
+            fft_harmonic = freq_from_fft(data, len(data))
+            harmonic = round(fft_harmonic / approx_freq)
+            peak_bin = fft_harmonic / harmonic
+
+            fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_freq)
+
+            freq_bin = min(peak_bin, fundamental_bin, key=abs)  # FIXME
             result_fft = []
 
             for harmonic in range(gauss.nyquist_inclusive(self.nsamp)):
