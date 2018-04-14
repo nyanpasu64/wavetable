@@ -212,10 +212,20 @@ def parse_at(at: str):
         elif ':' in word:
             chunks = [int(pos) if pos else None
                       for pos in word.split(':')]
+            if len(chunks) == 2:
+                chunks.append(None)
+
+            try:
+                if chunks[1] < chunks[0] and chunks[2] is None:
+                    chunks[2] = -1
+            except TypeError:
+                pass
+
             out.append(slice(*chunks))
         else:
             out.append(word)
     return out
+
 
 def main():
     default = n163_cfg()
