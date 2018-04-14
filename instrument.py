@@ -1,5 +1,5 @@
 from numbers import Number
-from typing import List
+from typing import List, Sequence, Union
 
 import numpy as np
 
@@ -21,12 +21,22 @@ class MergeInstr:  # (_Instr):
 
 
 class Instr:
+    seqs = ['wave_inds', 'vols', 'freqs']
+
     def __init__(self, waveseq: List[np.array], cfg: dict = None):
         cfg = AttrDict(cfg)
         self.waveseq = waveseq
+
         self.wave_inds = cfg.get('wave_inds', None)
+        if self.wave_inds is None:
+            self.wave_inds = np.arange(len(self.waveseq))
         self.vols = cfg.get('vols', None)
         self.freqs = cfg.get('freqs', None)
+
+        for seq_key in self.seqs:
+            seq = getattr(self, seq_key)
+            if isinstance(seq, list):
+                setattr(self, seq_key, np.array(seq))
 
     def print_waves(self):
         strs = [S(wave) for wave in self.waveseq]
@@ -34,8 +44,6 @@ class Instr:
         print()
 
         wave_inds = self.wave_inds
-        if wave_inds is None:
-            wave_inds = list(range(len(self.waveseq)))
         print(S(wave_inds))
         print()
 
@@ -56,6 +64,33 @@ class Instr:
         if self.freqs is not None:
             self.print_freqs(*args)
 
+    def __getitem__(self, get):
+        inds = []
+        loop_pos = -1
+
+        for i, elem in enumerate(get):
+            if isinstance(elem, str):
+                if elem == '|':
+                    loop_pos = len(inds)
+                else:
+                    raise ValueError('cannot get item "%s"' % elem)
+            else:
+                inds.extend(np.r_[elem])
+
+        end = max(inds) + 1
+
+        sub_instr = Instr(self.waveseq[:end])
+        for seq_key in self.seqs:
+            seq = getattr(self, seq_key)
+            if seq is not None:
+                seq = seq[inds]
+            setattr(sub_instr, seq_key, seq)
+
+        return sub_instr
+
+
+def deduplicate(instr: Instr):
+    return instr    # todo
 
 
 # def _get(seq, i):

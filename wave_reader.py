@@ -1,11 +1,13 @@
 import math
 import warnings
 from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Tuple, Sequence  # Optional
 from numbers import Number
 import sys
 
 import numpy as np
+import os
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
@@ -202,6 +204,19 @@ def unrounded_cfg():
     )
 
 
+def parse_at(at: str):
+    out = []
+    for word in at.split():
+        if word.isnumeric():
+            out.append(int(word))
+        elif ':' in word:
+            chunks = [int(pos) if pos else None
+                      for pos in word.split(':')]
+            out.append(slice(*chunks))
+        else:
+            out.append(word)
+    return out
+
 def main():
     default = n163_cfg()
 
@@ -221,6 +236,10 @@ def main():
         with redirect_stdout(f):
             read = WaveReader(path, cfg)
             instr = read.read()
+
+            if 'at' in cfg:
+                at = parse_at(cfg.at)
+                instr = instr[at]
 
             note = cfg['pitch_estimate']
             instr.print(note)
