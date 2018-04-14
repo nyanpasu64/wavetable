@@ -1,13 +1,11 @@
 import math
+import sys
 import warnings
 from contextlib import redirect_stdout
-from pathlib import Path
-from typing import Tuple, Sequence  # Optional
 from numbers import Number
-import sys
+from typing import Tuple, Sequence, Optional
 
 import numpy as np
-import os
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
@@ -56,7 +54,7 @@ class WaveReader:
         with warnings.catch_warnings():
             # Polyphone SF2 rips contain 'smpl' chunk with loop data
             warnings.simplefilter("ignore")
-            self.sr, self.wav = wavfile.read(path)    # type: int, np.ndarray
+            self.sr, self.wav = wavfile.read(path)  # type: int, np.ndarray
             if self.wav.ndim > 1:
                 self.wav = self.wav[:, 0]
 
@@ -74,7 +72,7 @@ class WaveReader:
             # Maximum of 1/60th second or 2 periods
             segment_time = max(self.frame_time, 2 / self.freq_estimate)
             self.segment_smp = self.s_t(segment_time)
-            self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))    # type: int
+            self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
 
             self.window = np.hanning(self.segment_smp)
             self.power_sum = wave_util.power_merge
@@ -104,14 +102,14 @@ class WaveReader:
     def raw_at(self, sample_offset):
         if sample_offset + self.segment_smp >= len(self.wav):
             sample_offset = len(self.wav) - self.segment_smp
-        data = self.wav[sample_offset:sample_offset + self.segment_smp]     # type: np.ndarray
+        data = self.wav[sample_offset:sample_offset + self.segment_smp]  # type: np.ndarray
         return data.copy()
 
     def stft(self, sample_offset):
         """ Phasor phases will match center of data, or peak of window. """
         data = self.raw_at(sample_offset)
         data *= self.window
-        phased_data = np.roll(data, len(data)//2)
+        phased_data = np.roll(data, len(data) // 2)
         return np.fft.rfft(phased_data)
 
     def wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
@@ -130,7 +128,7 @@ class WaveReader:
             # FFT produces a multiple of the true frequency.
             # So use a subharmonic of FFT frequency.
 
-            approx_freq = freq_from_autocorr(data, len(data)) # = self.freq_estimate
+            approx_freq = freq_from_autocorr(data, len(data))  # = self.freq_estimate
             fft_harmonic = freq_from_fft(data, len(data))
             harmonic = round(fft_harmonic / approx_freq)
             peak_bin = fft_harmonic / harmonic
@@ -160,7 +158,7 @@ class WaveReader:
 
             return wave, freq_hz, peak
 
-    def read(self, start: int=1):
+    def read(self, start: int = 1):
         """ For each frame, extract wave_at. """
         frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
         start_samp = start * frame_dsamp
