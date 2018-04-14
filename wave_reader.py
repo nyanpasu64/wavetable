@@ -216,7 +216,8 @@ def main():
     cfg = default
 
     path = cfg['file']
-    with open(path + '.txt', 'w') as f:
+    # with open(str(Path(cfg_path).parent / path) + '.txt', 'w') as f:
+    with open(cfg_path + '.txt', 'w') as f:
         with redirect_stdout(f):
             read = WaveReader(path, cfg)
             instr = read.read()
