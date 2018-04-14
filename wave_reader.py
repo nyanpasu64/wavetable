@@ -133,9 +133,10 @@ class WaveReader:
             harmonic = round(fft_harmonic / approx_freq)
             peak_bin = fft_harmonic / harmonic
 
-            fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_freq)
+            # fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_freq)
 
-            freq_bin = min(peak_bin, fundamental_bin, key=abs)  # FIXME
+            # freq_bin = min(peak_bin, fundamental_bin, key=abs)  # FIXME
+            freq_bin = peak_bin
             result_fft = []
 
             for harmonic in range(gauss.nyquist_inclusive(self.nsamp)):
