@@ -55,3 +55,10 @@ def test_reader_instr():
     assert isinstance(instr, Instr)
 
     instr.print(2, True)
+
+
+def test_subset():
+    read = WaveReader(PATH, cfg)
+    instr = read.read()
+    sub = instr[:20, 20:10:-1]
+    sub.print(74)
