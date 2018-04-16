@@ -112,9 +112,12 @@ class Merge:
         if fft == 'new':
             self.rfft = fourier.rfft_zoh
             self.irfft = fourier.irfft_zoh
-        elif fft == 'old':
+        elif fft == 'v1':
             self.rfft = fourier.rfft_norm
             self.irfft = fourier.irfft_old
+        elif fft == 'v0':
+            self.rfft = fourier.rfft_norm
+            self.irfft = fourier.irfft_norm
         else:
             raise ValueError(f'fft=[new, old] (you supplied {fft})')
 
