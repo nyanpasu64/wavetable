@@ -1,7 +1,7 @@
 from typing import List, Union
 
 import numpy as np
-from gauss import nyquist_exclusive, nyquist_inclusive
+from wavetable.gauss import nyquist_exclusive, nyquist_inclusive
 
 
 # I don't know why, but "inclusive" makes my test cases work.
@@ -14,15 +14,15 @@ def _zoh_transfer(nsamp):
 
 
 def _realify(a: np.ndarray):
-    return np.copysign(abs(a), a.real)
+    return np.copysign(np.abs(a), a.real)
 
 
-def _rfft(signal, *args, **kwargs) -> np.ndarray:
+def rfft_norm(signal, *args, **kwargs) -> np.ndarray:
     """ Computes "normalized" FFT of signal. """
     return np.fft.rfft(signal, *args, **kwargs) / len(signal)
 
 
-def _irfft(spectrum, nsamp=None, *args, **kwargs) -> np.ndarray:
+def irfft_norm(spectrum, nsamp=None, *args, **kwargs) -> np.ndarray:
     """ Computes "normalized" signal of spectrum. """
     signal = np.fft.irfft(spectrum, nsamp, *args, **kwargs)
     return signal * len(signal)
@@ -31,7 +31,7 @@ def _irfft(spectrum, nsamp=None, *args, **kwargs) -> np.ndarray:
 def rfft_zoh(signal):
     """ Computes "normalized" FFT of signal, with simulated ZOH frequency response. """
     nsamp = len(signal)
-    spectrum = _rfft(signal)
+    spectrum = rfft_norm(signal)
 
     # Muffle everything ~~but Nyquist~~, like real hardware.
     # Nyquist is already real.
@@ -62,7 +62,7 @@ def irfft_zoh(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
     if compute_nsamp:
         assert nin == len(spectrum)
 
-    spectrum = spectrum[:nin].copy()
+    spectrum = np.copy(spectrum[:nin])
 
     # Treble-boost everything ~~but Nyquist~~.
     # Make Nyquist purely real.
@@ -72,7 +72,7 @@ def irfft_zoh(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
     spectrum[:nyquist] /= _zoh_transfer(nsamp)
     spectrum[real:] = _realify(spectrum[real:])
 
-    return _irfft(spectrum, nsamp)
+    return irfft_norm(spectrum, nsamp)
 
 
 def _irfft_bad(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
@@ -100,4 +100,4 @@ def _irfft_bad(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
         last = spectrum[-1]
         spectrum[-1] = np.copysign(abs(last), last.real)
 
-    return _irfft(spectrum, nsamp)
+    return irfft_norm(spectrum, nsamp)
