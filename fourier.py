@@ -17,12 +17,12 @@ def _realify(a: np.ndarray):
     return np.copysign(abs(a), a.real)
 
 
-def rfft(signal, *args, **kwargs) -> np.ndarray:
+def _rfft(signal, *args, **kwargs) -> np.ndarray:
     """ Computes "normalized" FFT of signal. """
     return np.fft.rfft(signal, *args, **kwargs) / len(signal)
 
 
-def irfft(spectrum, nsamp=None, *args, **kwargs) -> np.ndarray:
+def _irfft(spectrum, nsamp=None, *args, **kwargs) -> np.ndarray:
     """ Computes "normalized" signal of spectrum. """
     signal = np.fft.irfft(spectrum, nsamp, *args, **kwargs)
     return signal * len(signal)
@@ -31,7 +31,7 @@ def irfft(spectrum, nsamp=None, *args, **kwargs) -> np.ndarray:
 def rfft_zoh(signal):
     """ Computes "normalized" FFT of signal, with simulated ZOH frequency response. """
     nsamp = len(signal)
-    spectrum = rfft(signal)
+    spectrum = _rfft(signal)
 
     # Muffle everything ~~but Nyquist~~, like real hardware.
     # Nyquist is already real.
@@ -41,7 +41,9 @@ def rfft_zoh(signal):
     return spectrum
 
 
-def zero_pad(spectrum, harmonic):
+def _zero_pad(spectrum, harmonic):
+    """ Do not use, concatenating a waveform multiple times works just as well. """
+
     # https://stackoverflow.com/a/5347492/2683842
     nyquist = len(spectrum) - 1
     padded = np.zeros(nyquist * harmonic + 1, dtype=complex)
@@ -70,7 +72,7 @@ def irfft_zoh(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
     spectrum[:nyquist] /= _zoh_transfer(nsamp)
     spectrum[real:] = _realify(spectrum[real:])
 
-    return irfft(spectrum, nsamp)
+    return _irfft(spectrum, nsamp)
 
 
 def _irfft_bad(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
@@ -98,4 +100,4 @@ def _irfft_bad(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
         last = spectrum[-1]
         spectrum[-1] = np.copysign(abs(last), last.real)
 
-    return irfft(spectrum, nsamp)
+    return _irfft(spectrum, nsamp)
