@@ -1,5 +1,5 @@
 import numpy as np
-from wavetable.merge import Instr
+# from wavetable.merge import Instr
 
 
 def filtered_saw_waves(N):
