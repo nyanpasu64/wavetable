@@ -17,18 +17,21 @@ def _realify(a: np.ndarray):
     return np.copysign(np.abs(a), a.real)
 
 
-def rfft_norm(signal, *args, **kwargs) -> np.ndarray:
+InputArray = Union[np.ndarray, List[complex]]
+
+
+def rfft_norm(signal: InputArray, *args, **kwargs) -> np.ndarray:
     """ Computes "normalized" FFT of signal. """
     return np.fft.rfft(signal, *args, **kwargs) / len(signal)
 
 
-def irfft_norm(spectrum, nsamp=None, *args, **kwargs) -> np.ndarray:
+def irfft_norm(spectrum: InputArray, nsamp=None, *args, **kwargs) -> np.ndarray:
     """ Computes "normalized" signal of spectrum. """
     signal = np.fft.irfft(spectrum, nsamp, *args, **kwargs)
     return signal * len(signal)
 
 
-def rfft_zoh(signal):
+def rfft_zoh(signal: InputArray):
     """ Computes "normalized" FFT of signal, with simulated ZOH frequency response. """
     nsamp = len(signal)
     spectrum = rfft_norm(signal)
@@ -41,7 +44,7 @@ def rfft_zoh(signal):
     return spectrum
 
 
-def _zero_pad(spectrum, harmonic):
+def _zero_pad(spectrum: InputArray, harmonic):
     """ Do not use, concatenating a waveform multiple times works just as well. """
 
     # https://stackoverflow.com/a/5347492/2683842
@@ -51,7 +54,7 @@ def _zero_pad(spectrum, harmonic):
     return padded
 
 
-def irfft_zoh(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
+def irfft_zoh(spectrum: InputArray, nsamp=None):
     """ Computes "normalized" signal of spectrum, counteracting ZOH frequency response. """
     compute_nsamp = (nsamp is None)
 
@@ -75,7 +78,7 @@ def irfft_zoh(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
     return irfft_norm(spectrum, nsamp)
 
 
-def _irfft_bad(spectrum: Union[np.ndarray, List[complex]], nsamp=None):
+def irfft_old(spectrum: InputArray, nsamp=None):
     """
     Calculate the inverse Fourier transform of $spectrum, optionally
     truncating to $nsamp entries.
