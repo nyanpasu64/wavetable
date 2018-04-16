@@ -2,6 +2,7 @@
 import py.test
 import pytest
 from wavetable.fourier import *
+from wavetable.fourier import _rfft, _irfft, _zero_pad
 
 
 def assert_close(a, b):
@@ -13,14 +14,14 @@ pulse = [1, 0, 0, 0]
 pulse3 = pulse * 3
 expected = [0.25] * 3
 
-fft1 = rfft(pulse)
+fft1 = _rfft(pulse)
 assert_close(fft1, expected)
 
 
 def test_irfft():
-    zoh1 = rfft(pulse)
-    zoh3 = zero_pad(zoh1, 3)
-    ipulse3 = irfft(zoh3)
+    zoh1 = _rfft(pulse)
+    zoh3 = _zero_pad(zoh1, 3)
+    ipulse3 = _irfft(zoh3)
     assert_close(ipulse3, pulse3)
 
 
@@ -37,7 +38,7 @@ def test_irfft_zoh():
 
 def test_irfft_pad():
     zoh1 = rfft_zoh(pulse)
-    zoh3 = zero_pad(zoh1, 3)
+    zoh3 = _zero_pad(zoh1, 3)
     ipulse3 = irfft_zoh(zoh3)
     assert_close(ipulse3, pulse3)
 
@@ -51,7 +52,7 @@ def test_integration():
     zoh1 = rfft_zoh(long_pulse)
     assert np.allclose(zoh1.imag, 0)
     zoh1 = zoh1.real
-    zoh3 = zero_pad(zoh1, FACTOR)
+    zoh3 = _zero_pad(zoh1, FACTOR)
     ipulse3 = irfft_zoh(zoh3, len(long_pulse))
     assert_close(ipulse3, pulse3)
 
@@ -68,6 +69,14 @@ if False:
     zoh1 = rfft_zoh(long_pulse)
     assert np.allclose(zoh1.imag, 0)
     zoh1 = zoh1.real
-    zoh3 = zero_pad(zoh1, FACTOR)
+    zoh3 = _zero_pad(zoh1, FACTOR)
 
     pulse3zoh = rfft_zoh(pulse3)
+
+
+""" One useful property is that fft([wave] * x) is identical to zero_pad(fft(wave), x). """
+def test_repeat():
+    cat = rfft_zoh(pulse * 3)
+    pad = _zero_pad(rfft_zoh(pulse), 3)
+    assert_close(cat, pad)
+    assert not np.allclose(cat, _rfft(pulse * 3))
