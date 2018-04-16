@@ -2,7 +2,7 @@
 import py.test
 import pytest
 from wavetable.fourier import *
-from wavetable.fourier import _rfft, _irfft, _zero_pad
+from wavetable.fourier import rfft_norm, irfft_norm, _zero_pad
 
 
 def assert_close(a, b):
@@ -14,14 +14,14 @@ pulse = [1, 0, 0, 0]
 pulse3 = pulse * 3
 expected = [0.25] * 3
 
-fft1 = _rfft(pulse)
+fft1 = rfft_norm(pulse)
 assert_close(fft1, expected)
 
 
 def test_irfft():
-    zoh1 = _rfft(pulse)
+    zoh1 = rfft_norm(pulse)
     zoh3 = _zero_pad(zoh1, 3)
-    ipulse3 = _irfft(zoh3)
+    ipulse3 = irfft_norm(zoh3)
     assert_close(ipulse3, pulse3)
 
 
@@ -79,4 +79,4 @@ def test_repeat():
     cat = rfft_zoh(pulse * 3)
     pad = _zero_pad(rfft_zoh(pulse), 3)
     assert_close(cat, pad)
-    assert not np.allclose(cat, _rfft(pulse * 3))
+    assert not np.allclose(cat, rfft_norm(pulse * 3))

@@ -2,8 +2,8 @@ import py.test
 import pytest
 from wavetable.instrument import Instr
 
-from wave_util import AttrDict
-from wave_reader import WaveReader
+from wavetable.wave_util import AttrDict
+from wavetable.wave_reader import WaveReader
 
 assert py.test
 

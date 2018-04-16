@@ -1,7 +1,22 @@
-from global_util import *
-import numpy as np
+# import sys
+# import math
+# from pipetools import pipe
 
-_gauss_table = ar([
+
+# from global_util import *
+import numpy as np
+from wavetable.instrument import S
+
+
+def cat(*args, **kwargs):
+    return np.concatenate(args, **kwargs)
+
+
+def al(l):
+    return np.array(list(l))
+
+
+_gauss_table = np.array([
     0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000,
     0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000,
     0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001,
@@ -140,7 +155,6 @@ assert (circular_convolve([1, 2, 3, 4, 5], [1]) == [1, 2, 3, 4, 5]).all()
 # FORMATTING
 def sprint(a, **kwargs):
     print(S(a), **kwargs)
-
 
 
 def ei(theta):

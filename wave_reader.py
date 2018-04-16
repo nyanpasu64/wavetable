@@ -148,7 +148,7 @@ class WaveReader:
                 amplitude = self.power_sum(bands)
                 result_fft.append(amplitude)
 
-            wave = fourier.irfft(result_fft)
+            wave = fourier.irfft(result_fft)    # FIXME
             if self.range:
                 wave, peak = self.rescaler.rescale_peak(wave)
             else:
