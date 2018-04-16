@@ -1,5 +1,5 @@
 from numbers import Number
-from typing import List
+from typing import List, Sequence, Union
 
 import numpy as np
 from wavetable.wave_util import AttrDict, freq2pitch
@@ -88,10 +88,16 @@ class MML(np.ndarray):
         return round(np.ndarray.__truediv__(self, other))
 
     def __round__(self):
-        # if ndigits is not None:
-        out = np.round(self)
+        # out = np.round(self)
+        out = np.ceil(self - 0.5)
         return out.astype(int)
 
+
+def I(s, *args, **kwargs):
+    return np.array([int(x, *args, **kwargs) for x in s.split()])
+
+def F(s):
+    return np.array([float(x) for x in s.split()])
 
 def S(a, sep=' '):
     if isinstance(a, MML):
@@ -100,21 +106,12 @@ def S(a, sep=' '):
         return sep.join(str(x) for x in a)
 
 
-class MergeInstr:  # (_Instr):
-    def __init__(self, waveseq: List[np.array], freq: Number = 1, amp: Number = 1,
-                 volseq=None):
-        self.waveseq = waveseq
-        self.freq = freq
-        self.amp = amp
-        self.volseq = volseq
-
-
 class Instr:
     seqs = ['wave_inds', 'vols', 'freqs']
 
-    def __init__(self, waveseq: List[np.array], cfg: dict = None):
-        cfg = AttrDict(cfg)
-        self.waveseq = waveseq
+    def __init__(self, waveseq: List[np.array], cfg: dict = None, **kwargs):
+        cfg = AttrDict(cfg, **kwargs)
+        self.waveseq = [np.asarray(wave) for wave in waveseq]
 
         self.wave_inds = cfg.get('wave_inds', None)
         if self.wave_inds is None:
@@ -186,20 +183,46 @@ class Instr:
 def deduplicate(instr: Instr):
     return instr  # todo
 
-# def _get(seq, i):
-#     """
-#     >>> arr = [0,1,2]
-#     >>> for i in range(10):
-#     ...     assert _get(arr, i) == min(i, 2)
-#
-#     >>> arr = np.array(arr)
-#     >>> for i in range(10):
-#     ...     assert _get(arr, i) == min(i, 2)
-#
-#     :param waveseq:
-#     :param i:
-#     :return:
-#     """
-#     if i >= len(seq):
-#         return seq[-1]
-#     return seq[i]
+
+def _get(waveseq: Sequence, i: int):
+    """
+    >>> arr = [0,1,2]
+    >>> for i in range(10):
+    ...     assert _get(arr, i) == min(i, 2)
+
+    >>> arr = np.array(arr)
+    >>> for i in range(10):
+    ...     assert _get(arr, i) == min(i, 2)
+
+    :param waveseq:
+    :param i:
+    :return:
+    """
+    if i >= len(waveseq):
+        return waveseq[-1]
+    return waveseq[i]
+
+
+def _normalize(numeric_arg: Union[Number, Sequence, None]) -> Sequence[Number]:
+    if numeric_arg is None:
+        return [1]
+    if isinstance(numeric_arg, Number):
+        return [numeric_arg]
+    return numeric_arg
+
+
+class MergeInstr(Instr):
+    def __init__(self, waveseq: List[np.array], harmonic: int = 1,
+                 vols: Union[Number, Sequence, MML] = None):
+
+        # super().'wave_inds', 'vols', 'freqs'
+        # We only use vols.
+
+        super().__init__(waveseq, vols=_normalize(vols))
+        self.harmonic = harmonic
+
+    def get_wave_scaled(self, idx):
+        wave = _get(self.waveseq, idx)
+        scaled = np.asarray(wave, float) * _get(self.vols, idx)
+        freqd = np.concatenate([scaled] * self.harmonic)
+        return freqd

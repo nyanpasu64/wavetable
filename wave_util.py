@@ -81,7 +81,7 @@ def iround(a):
     return np.round(a).astype(int)
 
 class Rescaler:
-    def __init__(self, maxrange, rounding='quantize', translate=True):
+    def __init__(self, maxrange: int, rounding='quantize', translate=True):
         self.max_range = maxrange
         self.rounding = rounding
         self.translate = translate
