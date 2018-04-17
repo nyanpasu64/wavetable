@@ -100,16 +100,13 @@ class Merge:
         'AMP':      wave_util.amplitude_merge,
         'SUM':      wave_util.sum_merge
     }
+    def __init__(self, maxrange: int, merge_style='POWER', fft='zoh', scaling='local'):
 
-    def __init__(self, maxrange: int,
-                 merge_style = 'POWER',
-                 scaling='local',
-                 fft='new'):
 
         self.phasor_merger = self.merge_funcs[merge_style]
         self.scaling = scaling
         self.rescaler = Rescaler(maxrange)
-        if fft == 'new':
+        if fft == 'zoh':
             self.rfft = fourier.rfft_zoh
             self.irfft = fourier.irfft_zoh
         elif fft == 'v1':
@@ -119,7 +116,7 @@ class Merge:
             self.rfft = fourier.rfft_norm
             self.irfft = fourier.irfft_norm
         else:
-            raise ValueError(f'fft=[new, old] (you supplied {fft})')
+            raise ValueError(f'fft=[zoh, v1, v0] (you supplied {fft})')
 
     def _merge_waves(self, waves: List[np.ndarray], nsamp, transfer):
         """ Depends on self.avg_func. """
