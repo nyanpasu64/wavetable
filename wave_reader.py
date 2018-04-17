@@ -57,7 +57,10 @@ class WaveReader:
                 self.wav = self.wav[:, 0]
 
         self.wav = self.wav.astype(float)
-        self.freq_estimate = pitch2freq(cfg.pitch_estimate)
+        if cfg.pitch_estimate:
+            self.freq_estimate = pitch2freq(cfg.pitch_estimate)
+        else:
+            self.freq_estimate = None
 
         self.nsamp = cfg.nsamp
         self.nwave = cfg.get('nwave', None)
@@ -68,9 +71,10 @@ class WaveReader:
         self.mode = cfg.get('mode', 'stft')
         if self.mode == 'stft':
             # Maximum of 1/60th second or 2 periods
-            segment_time = max(self.frame_time, 2 / self.freq_estimate)
+            segment_time = max(self.frame_time, 2 / (self.freq_estimate or math.inf))
             self.segment_smp = self.s_t(segment_time)
             self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
+            self.segment_time = self.t_s(self.segment_smp)
 
             self.window = np.hanning(self.segment_smp)
             self.power_sum = wave_util.power_merge
@@ -134,12 +138,17 @@ class WaveReader:
             # FFT produces a multiple of the true frequency.
             # So use a subharmonic of FFT frequency.
 
-            approx_freq = freq_from_autocorr(data, len(data))  # = self.freq_estimate
-            fft_harmonic = freq_from_fft(data, len(data))
-            harmonic = round(fft_harmonic / approx_freq)
-            peak_bin = fft_harmonic / harmonic
+            if self.freq_estimate:
+                # cyc/s * time/window = cyc/window
+                approx_bin = self.freq_estimate * self.segment_time
+            else:
+                approx_bin = freq_from_autocorr(data, len(data))
 
-            # fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_freq)
+            fft_peak = freq_from_fft(data, len(data))
+            harmonic = round(fft_peak / approx_bin)
+            peak_bin = fft_peak / harmonic
+
+            # fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_bin)
 
             # freq_bin = min(peak_bin, fundamental_bin, key=abs)  # FIXME
             freq_bin = peak_bin
