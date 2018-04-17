@@ -2,7 +2,6 @@ import math
 import sys
 import warnings
 from contextlib import redirect_stdout
-from numbers import Number
 from typing import Tuple, Sequence, Optional
 
 import numpy as np
@@ -17,33 +16,32 @@ from wavetable.playback import pitch2freq
 from wavetable.wave_util import AttrDict, Rescaler
 
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
-np.loge = np.ln = np.log
+# np.loge = np.ln = np.log
 
 DEFAULT_FPS = 60
 
 
-# TODO freq = fft / round(fft/autocorr)
-def freq_from_fft_limited(signal, *, end: Number):
-    from waveform_analysis._common import parabolic
-    from numpy.fft import rfft
-    from numpy import argmax, log
-    signal = np.asarray(signal)
-    N = len(signal)
-
-    # Compute Fourier transform of windowed signal
-    windowed = signal * np.kaiser(N, 100)
-    f = rfft(windowed)[:int(end)]
-    f[0] = 1e-9
-
-    # Find the peak and interpolate to get a more accurate peak
-    i_peak = argmax(abs(f))  # Just use this value for less-accurate result
-    # print(abs(f))
-    # print(i_peak)
-    try:
-        i_interp = parabolic(log(abs(f)), i_peak)[0]
-        return i_interp
-    except IndexError:
-        return float(i_peak)
+# def freq_from_fft_limited(signal, *, end: SupportsInt):
+#     from waveform_analysis._common import parabolic
+#     from numpy.fft import rfft
+#     from numpy import argmax, log
+#     signal = np.asarray(signal)
+#     N = len(signal)
+#
+#     # Compute Fourier transform of windowed signal
+#     windowed = signal * np.kaiser(N, 100)
+#     f = rfft(windowed)[:int(end)]
+#     f[0] = 1e-9
+#
+#     # Find the peak and interpolate to get a more accurate peak
+#     i_peak = argmax(abs(f))  # Just use this value for less-accurate result
+#     # print(abs(f))
+#     # print(i_peak)
+#     try:
+#         i_interp = parabolic(log(abs(f)), i_peak)[0]
+#         return i_interp
+#     except IndexError:
+#         return float(i_peak)
 
 
 class WaveReader:
@@ -76,8 +74,16 @@ class WaveReader:
 
             self.window = np.hanning(self.segment_smp)
             self.power_sum = wave_util.power_merge
+
+            fft_mode = cfg.get('fft_mode', 'normal')
+            if fft_mode == 'normal':
+                self.irfft = fourier.irfft_norm
+            elif fft_mode == 'zoh':
+                self.irfft = fourier.irfft_zoh
+            else:
+                raise ValueError(f'fft_mode=[zoh, normal] (you supplied {fft_mode})')
         else:
-            raise NotImplementedError('only stft supported')
+            raise ValueError('only mode=stft only supported')
 
         self.range = cfg.range  # type: Optional[int]
         if self.range:
@@ -148,7 +154,7 @@ class WaveReader:
                 amplitude = self.power_sum(bands)
                 result_fft.append(amplitude)
 
-            wave = fourier.irfft(result_fft)    # FIXME
+            wave = self.irfft(result_fft)
             if self.range:
                 wave, peak = self.rescaler.rescale_peak(wave)
             else:
