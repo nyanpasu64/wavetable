@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 import sys
 import warnings
 from contextlib import redirect_stdout
@@ -8,6 +9,7 @@ import numpy as np
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
+
 from wavetable import fourier
 from wavetable import gauss
 from wavetable import wave_util
@@ -45,7 +47,7 @@ DEFAULT_FPS = 60
 
 
 class WaveReader:
-    def __init__(self, path, cfg: dict):
+    def __init__(self, path: str, cfg: dict):
         cfg = AttrDict(cfg)
 
         self.path = path
@@ -243,21 +245,20 @@ def parse_at(at: str):
 def main():
     default = n163_cfg()
 
-    cfg_path = sys.argv[1]
+    cfg_path = Path(sys.argv[1])
 
     yaml = YAML(typ='safe')
-    with open(cfg_path) as f:
+    with open(str(cfg_path)) as f:
         cfg = yaml.load(f)
     print(cfg)
 
     default.update(cfg)
     cfg = default
 
-    path = cfg['file']
-    # with open(str(Path(cfg_path).parent / path) + '.txt', 'w') as f:
-    with open(cfg_path + '.txt', 'w') as f:
+    wav_path = Path(cfg_path.parent, cfg['file'])
+    with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
-            read = WaveReader(path, cfg)
+            read = WaveReader(str(wav_path), cfg)
             instr = read.read()
 
             if 'at' in cfg:
