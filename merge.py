@@ -85,10 +85,10 @@ def print_waves(waveseq):
 print_waveseq = print_waves
 
 
-class MergeStyle(Enum):
-    POWER = 1
-    AMPLITUDE = 2
-    SUM = 3
+# class MergeStyle(Enum):
+#     POWER = 1
+#     AMPLITUDE = 2
+#     SUM = 3
 
 
 _MAXRANGE = 16
@@ -96,28 +96,37 @@ _MAXRANGE = 16
 
 class Merge:
     merge_funcs = {
-        MergeStyle.POWER:       wave_util.power_merge,
-        MergeStyle.AMPLITUDE:   wave_util.amplitude_merge,
-        MergeStyle.SUM:         wave_util.sum_merge
+        'POWER':    wave_util.power_merge,
+        'AMP':      wave_util.amplitude_merge,
+        'SUM':      wave_util.sum_merge
     }
+    def __init__(self, maxrange: int, merge_style='POWER', fft='zoh', scaling='local'):
 
-    def __init__(self, maxrange: int,
-                 merge_style: MergeStyle = MergeStyle.POWER,
-                 scaling='local'):
 
         self.phasor_merger = self.merge_funcs[merge_style]
         self.scaling = scaling
         self.rescaler = Rescaler(maxrange)
+        if fft == 'zoh':
+            self.rfft = fourier.rfft_zoh
+            self.irfft = fourier.irfft_zoh
+        elif fft == 'v1':
+            self.rfft = fourier.rfft_norm
+            self.irfft = fourier.irfft_old
+        elif fft == 'v0':
+            self.rfft = fourier.rfft_norm
+            self.irfft = fourier.irfft_norm
+        else:
+            raise ValueError(f'fft=[zoh, v1, v0] (you supplied {fft})')
 
     def _merge_waves(self, waves: List[np.ndarray], nsamp, transfer):
         """ Depends on self.avg_func. """
-        ffts = [fourier.rfft_zoh(wave) for wave in waves]
+        ffts = [self.rfft(wave) for wave in waves]
 
         outs = []
         for f, phasors in enumerate(itertools.zip_longest(*ffts, fillvalue=0j)):
             outs.append(self.phasor_merger(phasors) * transfer(f))
 
-        wave_out = fourier.irfft_zoh(outs, nsamp)
+        wave_out = self.irfft(outs, nsamp)
         if self.scaling == 'local':
             return self.rescaler.rescale(wave_out)
         else:
