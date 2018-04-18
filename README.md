@@ -5,10 +5,12 @@
 Install Miniconda3 (<https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>).
 
 ```shell
-conda install numpy scipy
+pip install numpy scipy
 pip install ruamel.yaml
 pip install git+https://github.com/endolith/waveform_analysis.git@4bb2085
 ```
+
+(I used to recommend `conda install numpy scipy`, but due to wheels, pip no longer requires a working compiler toolchain and inordinate build times on Windows.)
 
 ## Executing
 
