@@ -1,6 +1,6 @@
-## WAV to N163 converter
+# WAV to N163 converter
 
-### Installation:
+## Installation:
 
 Install Miniconda3 (<https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>).
 
@@ -10,7 +10,7 @@ pip install ruamel.yaml
 pip install git+https://github.com/endolith/waveform_analysis.git@4bb2085
 ```
 
-### Executing
+## Executing
 
 I recommend associating the .n163 file extension with `wave_reader.cmd`, then double-click `config.n163` to run.
 Alternatively, you can run `wave_reader.py config.yaml`.
