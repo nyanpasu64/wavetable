@@ -1,6 +1,5 @@
 import itertools
 from collections import OrderedDict
-from enum import Enum
 from typing import List
 
 import numpy as np
@@ -84,7 +83,6 @@ def print_waves(waveseq):
 
 print_waveseq = print_waves
 
-
 # class MergeStyle(Enum):
 #     POWER = 1
 #     AMPLITUDE = 2
@@ -96,12 +94,12 @@ _MAXRANGE = 16
 
 class Merge:
     merge_funcs = {
-        'POWER':    wave_util.power_merge,
-        'AMP':      wave_util.amplitude_merge,
-        'SUM':      wave_util.sum_merge
+        'POWER': wave_util.power_merge,
+        'AMP': wave_util.amplitude_merge,
+        'SUM': wave_util.sum_merge
     }
-    def __init__(self, maxrange: int, merge_style='POWER', fft='zoh', scaling='local'):
 
+    def __init__(self, maxrange: int, merge_style='POWER', fft='zoh', scaling='local'):
 
         self.phasor_merger = self.merge_funcs[merge_style]
         self.scaling = scaling
