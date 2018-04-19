@@ -1,14 +1,15 @@
 import math
+from pathlib import Path
 import sys
 import warnings
 from contextlib import redirect_stdout
-from numbers import Number
 from typing import Tuple, Sequence, Optional
 
 import numpy as np
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
+
 from wavetable import fourier
 from wavetable import gauss
 from wavetable import wave_util
@@ -17,37 +18,36 @@ from wavetable.playback import pitch2freq
 from wavetable.wave_util import AttrDict, Rescaler
 
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
-np.loge = np.ln = np.log
+# np.loge = np.ln = np.log
 
 DEFAULT_FPS = 60
 
 
-# TODO freq = fft / round(fft/autocorr)
-def freq_from_fft_limited(signal, *, end: Number):
-    from waveform_analysis._common import parabolic
-    from numpy.fft import rfft
-    from numpy import argmax, log
-    signal = np.asarray(signal)
-    N = len(signal)
-
-    # Compute Fourier transform of windowed signal
-    windowed = signal * np.kaiser(N, 100)
-    f = rfft(windowed)[:int(end)]
-    f[0] = 1e-9
-
-    # Find the peak and interpolate to get a more accurate peak
-    i_peak = argmax(abs(f))  # Just use this value for less-accurate result
-    # print(abs(f))
-    # print(i_peak)
-    try:
-        i_interp = parabolic(log(abs(f)), i_peak)[0]
-        return i_interp
-    except IndexError:
-        return float(i_peak)
+# def freq_from_fft_limited(signal, *, end: SupportsInt):
+#     from waveform_analysis._common import parabolic
+#     from numpy.fft import rfft
+#     from numpy import argmax, log
+#     signal = np.asarray(signal)
+#     N = len(signal)
+#
+#     # Compute Fourier transform of windowed signal
+#     windowed = signal * np.kaiser(N, 100)
+#     f = rfft(windowed)[:int(end)]
+#     f[0] = 1e-9
+#
+#     # Find the peak and interpolate to get a more accurate peak
+#     i_peak = argmax(abs(f))  # Just use this value for less-accurate result
+#     # print(abs(f))
+#     # print(i_peak)
+#     try:
+#         i_interp = parabolic(log(abs(f)), i_peak)[0]
+#         return i_interp
+#     except IndexError:
+#         return float(i_peak)
 
 
 class WaveReader:
-    def __init__(self, path, cfg: dict):
+    def __init__(self, path: str, cfg: dict):
         cfg = AttrDict(cfg)
 
         self.path = path
@@ -59,7 +59,10 @@ class WaveReader:
                 self.wav = self.wav[:, 0]
 
         self.wav = self.wav.astype(float)
-        self.freq_estimate = pitch2freq(cfg.pitch_estimate)
+        if cfg.pitch_estimate:
+            self.freq_estimate = pitch2freq(cfg.pitch_estimate)
+        else:
+            self.freq_estimate = None
 
         self.nsamp = cfg.nsamp
         self.nwave = cfg.get('nwave', None)
@@ -70,14 +73,23 @@ class WaveReader:
         self.mode = cfg.get('mode', 'stft')
         if self.mode == 'stft':
             # Maximum of 1/60th second or 2 periods
-            segment_time = max(self.frame_time, 2 / self.freq_estimate)
+            segment_time = max(self.frame_time, 2 / (self.freq_estimate or math.inf))
             self.segment_smp = self.s_t(segment_time)
             self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
+            self.segment_time = self.t_s(self.segment_smp)
 
             self.window = np.hanning(self.segment_smp)
             self.power_sum = wave_util.power_merge
+
+            fft_mode = cfg.get('fft_mode', 'normal')
+            if fft_mode == 'normal':
+                self.irfft = fourier.irfft_norm
+            elif fft_mode == 'zoh':
+                self.irfft = fourier.irfft_zoh
+            else:
+                raise ValueError(f'fft_mode=[zoh, normal] (you supplied {fft_mode})')
         else:
-            raise NotImplementedError('only stft supported')
+            raise ValueError('only mode=stft only supported')
 
         self.range = cfg.range  # type: Optional[int]
         if self.range:
@@ -128,12 +140,17 @@ class WaveReader:
             # FFT produces a multiple of the true frequency.
             # So use a subharmonic of FFT frequency.
 
-            approx_freq = freq_from_autocorr(data, len(data))  # = self.freq_estimate
-            fft_harmonic = freq_from_fft(data, len(data))
-            harmonic = round(fft_harmonic / approx_freq)
-            peak_bin = fft_harmonic / harmonic
+            if self.freq_estimate:
+                # cyc/s * time/window = cyc/window
+                approx_bin = self.freq_estimate * self.segment_time
+            else:
+                approx_bin = freq_from_autocorr(data, len(data))
 
-            # fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_freq)
+            fft_peak = freq_from_fft(data, len(data))
+            harmonic = round(fft_peak / approx_bin)
+            peak_bin = fft_peak / harmonic
+
+            # fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_bin)
 
             # freq_bin = min(peak_bin, fundamental_bin, key=abs)  # FIXME
             freq_bin = peak_bin
@@ -148,7 +165,7 @@ class WaveReader:
                 amplitude = self.power_sum(bands)
                 result_fft.append(amplitude)
 
-            wave = fourier.irfft(result_fft)    # FIXME
+            wave = self.irfft(result_fft)
             if self.range:
                 wave, peak = self.rescaler.rescale_peak(wave)
             else:
@@ -225,24 +242,23 @@ def parse_at(at: str):
     return out
 
 
-def main():
+def main(cfg_path):
     default = n163_cfg()
 
-    cfg_path = sys.argv[1]
+    cfg_path = Path(cfg_path)
 
     yaml = YAML(typ='safe')
-    with open(cfg_path) as f:
+    with open(str(cfg_path)) as f:
         cfg = yaml.load(f)
-    print(cfg)
+    # print(cfg)
 
     default.update(cfg)
     cfg = default
 
-    path = cfg['file']
-    # with open(str(Path(cfg_path).parent / path) + '.txt', 'w') as f:
-    with open(cfg_path + '.txt', 'w') as f:
+    wav_path = Path(cfg_path.parent, cfg['file'])
+    with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
-            read = WaveReader(path, cfg)
+            read = WaveReader(str(wav_path), cfg)
             instr = read.read()
 
             if 'at' in cfg:
@@ -254,4 +270,23 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    if 1 < len(sys.argv):
+        main(sys.argv[1])
+    else:
+        message = 'Usage: %s config.n163' % Path(__file__).name + '''
+
+config.n163 is a YAML file:
+
+file: "filename.wav"        # quotes are optional
+nsamp: N163 wave length
+pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
+                                # This tool may estimate the wrong octave, if line is missing.
+                                # Exclude if WAV file has pitch changes 1 octave or greater.
+at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
+                                # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
+                                # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
+[optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
+[optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
+[optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+'''
+        print(message, file=sys.stderr)
