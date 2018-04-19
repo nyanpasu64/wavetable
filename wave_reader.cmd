@@ -1,1 +1,1 @@
-@python3 "%~dp0\wave_reader.py" %*
+@py -3 "%~dp0\wave_reader.py" %*
