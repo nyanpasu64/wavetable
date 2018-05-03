@@ -10,7 +10,7 @@ from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
 
-from wavetable import fourier
+from wavetable import fourier, transfer
 from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr
@@ -19,31 +19,6 @@ from wavetable.wave_util import AttrDict, Rescaler
 
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 # np.loge = np.ln = np.log
-
-DEFAULT_FPS = 60
-
-
-# def freq_from_fft_limited(signal, *, end: SupportsInt):
-#     from waveform_analysis._common import parabolic
-#     from numpy.fft import rfft
-#     from numpy import argmax, log
-#     signal = np.asarray(signal)
-#     N = len(signal)
-#
-#     # Compute Fourier transform of windowed signal
-#     windowed = signal * np.kaiser(N, 100)
-#     f = rfft(windowed)[:int(end)]
-#     f[0] = 1e-9
-#
-#     # Find the peak and interpolate to get a more accurate peak
-#     i_peak = argmax(abs(f))  # Just use this value for less-accurate result
-#     # print(abs(f))
-#     # print(i_peak)
-#     try:
-#         i_interp = parabolic(log(abs(f)), i_peak)[0]
-#         return i_interp
-#     except IndexError:
-#         return float(i_peak)
 
 
 class WaveReader:
@@ -65,23 +40,23 @@ class WaveReader:
             self.freq_estimate = None
 
         self.nsamp = cfg.nsamp
-        self.nwave = cfg.get('nwave', None)
-        self.fps = cfg.get('fps', DEFAULT_FPS)
+        self.nwave = cfg.nwave
+        self.fps = cfg.fps
         self.frame_time = 1 / self.fps
-        self.offset = cfg.get('offset', 0.5)
+        # self.offset = cfg.get('offset', 0.5)
 
-        self.mode = cfg.get('mode', 'stft')
+        self.mode = cfg.mode
         if self.mode == 'stft':
-            # Maximum of 1/60th second or 2 periods
-            segment_time = max(self.frame_time, 2 / (self.freq_estimate or math.inf))
+            segment_time = self.frame_time * cfg.width_frames
             self.segment_smp = self.s_t(segment_time)
             self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
             self.segment_time = self.t_s(self.segment_smp)
 
             self.window = np.hanning(self.segment_smp)
             self.power_sum = wave_util.power_merge
+            self.transfer = eval(cfg.transfer)
 
-            fft_mode = cfg.get('fft_mode', 'normal')
+            fft_mode = cfg.fft_mode
             if fft_mode == 'normal':
                 self.irfft = fourier.irfft_norm
             elif fft_mode == 'zoh':
@@ -95,7 +70,7 @@ class WaveReader:
         if self.range:
             self.rescaler = Rescaler(self.range)
 
-        self.vol_range = cfg.get('vol_range', None)
+        self.vol_range = cfg.vol_range
         if self.vol_range:
             self.vol_rescaler = Rescaler(self.vol_range, translate=False)
 
@@ -163,6 +138,8 @@ class WaveReader:
                 # print(begin, end)
                 bands = stft[math.ceil(begin):math.ceil(end)]
                 amplitude = self.power_sum(bands)
+                if harmonic > 0:
+                    amplitude *= self.transfer(harmonic)
                 result_fft.append(amplitude)
 
             wave = self.irfft(result_fft)
@@ -207,7 +184,17 @@ def n163_cfg():
     return AttrDict(
         range=16,
         vol_range=16,
-        fps=60
+        fps=60,
+        mode='stft',
+        fft_mode='normal',
+        start=0,
+        width_frames=1,
+        transfer='transfers.Unity()',
+
+        file=None,
+        nwave=None,
+        nsamp=None,
+        pitch_estimate=None,
     )
 
 
@@ -245,7 +232,7 @@ def parse_at(at: str):
 def main(cfg_path):
     default = n163_cfg()
 
-    cfg_path = Path(cfg_path)
+    cfg_path = Path(cfg_path).resolve()
 
     yaml = YAML(typ='safe')
     with open(str(cfg_path)) as f:
@@ -259,7 +246,7 @@ def main(cfg_path):
     with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
             read = WaveReader(str(wav_path), cfg)
-            instr = read.read()
+            instr = read.read(cfg.start)
 
             if 'at' in cfg:
                 at = parse_at(cfg.at)
