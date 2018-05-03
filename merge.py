@@ -11,6 +11,7 @@ from wavetable.instrument import MergeInstr
 from wavetable.wave_util import Rescaler
 
 
+# todo, MML belongs in Instrument
 def load_string(s):
     """
     >>> (load_string('  0 1 2 3; 4 5 6 7  ;;;  ') == [[0,1,2,3], [4,5,6,7]]).all()

@@ -9,6 +9,19 @@ LOOP = '|'
 RELEASE = '/'
 
 
+def I(s, *args, **kwargs):
+    return np.array([int(x, *args, **kwargs) for x in s.split()])
+
+def F(s):
+    return np.array([float(x) for x in s.split()])
+
+def S(a, sep=' '):
+    if isinstance(a, MML):
+        return str(a)
+    else:
+        return sep.join(str(x) for x in a)
+
+
 class MML(np.ndarray):
     """
     >>> m = MML('0 1 2 3 4 | 5 5 5')
@@ -91,19 +104,6 @@ class MML(np.ndarray):
         # out = np.round(self)
         out = np.ceil(self - 0.5)
         return out.astype(int)
-
-
-def I(s, *args, **kwargs):
-    return np.array([int(x, *args, **kwargs) for x in s.split()])
-
-def F(s):
-    return np.array([float(x) for x in s.split()])
-
-def S(a, sep=' '):
-    if isinstance(a, MML):
-        return str(a)
-    else:
-        return sep.join(str(x) for x in a)
 
 
 class Instr:
