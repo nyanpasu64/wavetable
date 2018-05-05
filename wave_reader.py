@@ -209,10 +209,14 @@ def unrounded_cfg():
 def parse_at(at: str):
     out = []
     for word in at.split():
-        if word.isnumeric():
-            out.append(int(word))
-        elif ':' in word:
-            chunks = [int(pos) if pos else None
+        try:
+            out.append(int(word, 0))
+            continue
+        except ValueError:
+            pass
+
+        if ':' in word:
+            chunks = [int(pos, 0) if pos else None
                       for pos in word.split(':')]
             if len(chunks) == 2:
                 chunks.append(None)
