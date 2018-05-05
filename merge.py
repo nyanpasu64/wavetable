@@ -6,7 +6,7 @@ import numpy as np
 from wavetable import wave_util
 from wavetable.instrument import _get, I, F, S
 from wavetable import fourier
-from wavetable import transfer as transfers
+from wavetable import transfers
 from wavetable.instrument import MergeInstr
 from wavetable.wave_util import Rescaler
 

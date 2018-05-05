@@ -10,7 +10,7 @@ from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
 
-from wavetable import fourier, transfer
+from wavetable import fourier, transfers
 from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr
