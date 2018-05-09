@@ -24,6 +24,7 @@ from wavetable.wave_util import AttrDict, Rescaler
 class WaveReader:
     def __init__(self, path: str, cfg: dict):
         cfg = AttrDict(cfg)
+        # TODO: cfg.pop() and ensure no invalid entries
 
         self.path = path
         with warnings.catch_warnings():
@@ -44,6 +45,7 @@ class WaveReader:
         self.fps = cfg.fps
         self.frame_time = 1 / self.fps
         # self.offset = cfg.get('offset', 0.5)
+        self.start = cfg.start
 
         self.mode = cfg.mode
         if self.mode == 'stft':
@@ -152,8 +154,12 @@ class WaveReader:
 
             return wave, freq_hz, peak
 
-    def read(self, start: int = 1):
+    def read(self, start: int = None):
         """ For each frame, extract wave_at. """
+
+        if start is None:
+            start = self.start
+
         frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
         start_samp = start * frame_dsamp
         if self.nwave:
@@ -180,11 +186,12 @@ class WaveReader:
         return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
 
 
-def n163_cfg():
-    return AttrDict(
-        range=16,
-        vol_range=16,
+def unrounded_cfg(mapping={}, **kwargs):
+    d = dict(
+        range=None,
+        vol_range=None,
         fps=60,
+
         mode='stft',
         fft_mode='normal',
         start=0,
@@ -196,14 +203,19 @@ def n163_cfg():
         nsamp=None,
         pitch_estimate=None,
     )
+    d.update(mapping)
+    d.update(kwargs)
+    return d
 
 
-def unrounded_cfg():
-    return AttrDict(
-        range=None,
-        vol_range=None,
-        fps=60
+def n163_cfg(mapping={}, **kwargs):
+    d = unrounded_cfg(
+        range=16,
+        vol_range=16
     )
+    d.update(mapping)
+    d.update(kwargs)
+    return d
 
 
 def parse_at(at: str):
@@ -234,17 +246,13 @@ def parse_at(at: str):
 
 
 def main(cfg_path):
-    default = n163_cfg()
-
     cfg_path = Path(cfg_path).resolve()
 
     yaml = YAML(typ='safe')
     with open(str(cfg_path)) as f:
-        cfg = yaml.load(f)
-    # print(cfg)
+        file_cfg = yaml.load(f)
 
-    default.update(cfg)
-    cfg = default
+    cfg = n163_cfg(file_cfg)
 
     wav_path = Path(cfg_path.parent, cfg['file'])
     with open(str(cfg_path) + '.txt', 'w') as f:
