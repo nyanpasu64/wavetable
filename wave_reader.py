@@ -187,7 +187,7 @@ class WaveReader:
 
 
 def unrounded_cfg(mapping={}, **kwargs):
-    d = dict(
+    d = AttrDict(
         range=None,
         vol_range=None,
         fps=60,
