@@ -1,0 +1,3 @@
+TODO: make an ipython notebook, which plots the harmonics for each bin. Check if phasors are aligned about center of window. (I expect yes.)
+
+Then plot (to compare) the reconstruction accuracy, for "phasor sum" vs "phasor power". (I expect switching to first to be better.)
