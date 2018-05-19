@@ -65,15 +65,6 @@ def test_multiscale():
     assert_close(short, long[:len(short)])
 
 
-if False:
-    zoh1 = rfft_zoh(long_pulse)
-    assert np.allclose(zoh1.imag, 0)
-    zoh1 = zoh1.real
-    zoh3 = _zero_pad(zoh1, FACTOR)
-
-    pulse3zoh = rfft_zoh(pulse3)
-
-
 """ One useful property is that fft([wave] * x) is identical to zero_pad(fft(wave), x). """
 def test_repeat():
     cat = rfft_zoh(pulse * 3)
