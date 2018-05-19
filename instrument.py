@@ -98,7 +98,7 @@ class MML(np.ndarray):
         return new
 
     def __truediv__(self, other):
-        return round(np.ndarray.__truediv__(self, other))
+        return self // other
 
     def __round__(self):
         # out = np.round(self)
