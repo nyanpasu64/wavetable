@@ -24,8 +24,9 @@ def cfg(request):
 
 
 def test_wave_at(cfg):
+    """ Ensures wave is not constant. """
     read = WaveReader(PATH, cfg)
-    wave, *_ = read.wave_at(0)
+    wave = read.wave_at(0)[0]
     assert not (wave == wave[0]).all()
 
 
