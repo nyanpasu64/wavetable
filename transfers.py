@@ -4,7 +4,7 @@ import numpy as np
 
 from wavetable import fourier
 from wavetable.instrument import Instr
-from wavetable.reprmixin import ReprMixin
+from wavetable.util.reprmixin import ReprMixin
 
 
 class TransferFunctor(ReprMixin):
