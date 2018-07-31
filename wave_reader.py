@@ -1,8 +1,8 @@
 import math
-from pathlib import Path
 import sys
 import warnings
 from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Tuple, Sequence, Optional
 
 import numpy as np
@@ -17,8 +17,91 @@ from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
 from wavetable.wave_util import AttrDict, Rescaler
 
+assert transfers    # module used by cfg.transfer
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 # np.loge = np.ln = np.log
+
+
+def main(cfg_path):
+    cfg_path = Path(cfg_path).resolve()
+
+    yaml = YAML(typ='safe')
+    with open(str(cfg_path)) as f:
+        file_cfg = yaml.load(f)
+
+    cfg = n163_cfg(file_cfg)
+
+    wav_path = Path(cfg_path.parent, cfg['file'])
+    with open(str(cfg_path) + '.txt', 'w') as f:
+        with redirect_stdout(f):
+            read = WaveReader(str(wav_path), cfg)
+            instr = read.read(cfg.start)
+
+            if 'at' in cfg:
+                at = parse_at(cfg.at)
+                instr = instr[at]
+
+            note = cfg['pitch_estimate']
+            instr.print(note)
+
+
+def parse_at(at: str):
+    out = []
+    for word in at.split():
+        try:
+            out.append(int(word, 0))
+            continue
+        except ValueError:
+            pass
+
+        if ':' in word:
+            chunks = [int(pos, 0) if pos else None
+                      for pos in word.split(':')]
+            if len(chunks) == 2:
+                chunks.append(None)
+
+            try:
+                if chunks[1] < chunks[0] and chunks[2] is None:
+                    chunks[2] = -1
+            except TypeError:
+                pass
+
+            out.append(slice(*chunks))
+        else:
+            out.append(word)
+    return out
+
+
+def unrounded_cfg(mapping={}, **kwargs):
+    d = AttrDict(
+        range=None,
+        vol_range=None,
+        fps=60,
+
+        mode='stft',
+        fft_mode='normal',
+        start=0,
+        width_frames=1,
+        transfer='transfers.Unity()',
+
+        file=None,
+        nwave=None,
+        nsamp=None,
+        pitch_estimate=None,
+    )
+    d.update(mapping)
+    d.update(kwargs)
+    return d
+
+
+def n163_cfg(mapping={}, **kwargs):
+    d = unrounded_cfg(
+        range=16,
+        vol_range=16
+    )
+    d.update(mapping)
+    d.update(kwargs)
+    return d
 
 
 class WaveReader:
@@ -177,88 +260,6 @@ class WaveReader:
         if self.vol_range:
             vols = self.vol_rescaler.rescale(vols)
         return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
-
-
-def unrounded_cfg(mapping={}, **kwargs):
-    d = AttrDict(
-        range=None,
-        vol_range=None,
-        fps=60,
-
-        mode='stft',
-        fft_mode='normal',
-        start=0,
-        width_frames=1,
-        transfer='transfers.Unity()',
-
-        file=None,
-        nwave=None,
-        nsamp=None,
-        pitch_estimate=None,
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
-def n163_cfg(mapping={}, **kwargs):
-    d = unrounded_cfg(
-        range=16,
-        vol_range=16
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
-def parse_at(at: str):
-    out = []
-    for word in at.split():
-        try:
-            out.append(int(word, 0))
-            continue
-        except ValueError:
-            pass
-
-        if ':' in word:
-            chunks = [int(pos, 0) if pos else None
-                      for pos in word.split(':')]
-            if len(chunks) == 2:
-                chunks.append(None)
-
-            try:
-                if chunks[1] < chunks[0] and chunks[2] is None:
-                    chunks[2] = -1
-            except TypeError:
-                pass
-
-            out.append(slice(*chunks))
-        else:
-            out.append(word)
-    return out
-
-
-def main(cfg_path):
-    cfg_path = Path(cfg_path).resolve()
-
-    yaml = YAML(typ='safe')
-    with open(str(cfg_path)) as f:
-        file_cfg = yaml.load(f)
-
-    cfg = n163_cfg(file_cfg)
-
-    wav_path = Path(cfg_path.parent, cfg['file'])
-    with open(str(cfg_path) + '.txt', 'w') as f:
-        with redirect_stdout(f):
-            read = WaveReader(str(wav_path), cfg)
-            instr = read.read(cfg.start)
-
-            if 'at' in cfg:
-                at = parse_at(cfg.at)
-                instr = instr[at]
-
-            note = cfg['pitch_estimate']
-            instr.print(note)
 
 
 if __name__ == '__main__':
