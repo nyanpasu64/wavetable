@@ -131,7 +131,8 @@ class WaveReader:
                 end = freq_bin * (harmonic + 0.5)
                 # print(begin, end)
                 bands = stft[math.ceil(begin):math.ceil(end)]
-                amplitude = self.power_sum(bands)
+                # TODO if bands are uncorrelated, self.power_sum is better
+                amplitude = np.sum(bands)
                 if harmonic > 0:
                     amplitude *= self.transfer(harmonic)
                 result_fft.append(amplitude)
