@@ -8,7 +8,7 @@ from typing import Tuple, Sequence, Optional
 import numpy as np
 from ruamel.yaml import YAML
 from scipy.io import wavfile
-from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
+from waveform_analysis.freq_estimation import freq_from_autocorr
 
 from wavetable import fourier, transfers
 from wavetable import gauss
@@ -113,24 +113,16 @@ class WaveReader:
             data = self.raw_at(sample_offset)
             stft = self.stft(sample_offset)
 
-            # Autocorrelation is imprecise.
-            # FFT produces a multiple of the true frequency.
-            # So use a subharmonic of FFT frequency.
-
             if self.freq_estimate:
                 # cyc/s * time/window = cyc/window
                 approx_bin = self.freq_estimate * self.segment_time
+                fft_peak = freq_from_autocorr(data, len(data))
+                harmonic = round(fft_peak / approx_bin)
+                freq_bin = fft_peak / harmonic
+
             else:
-                approx_bin = freq_from_autocorr(data, len(data))
+                freq_bin = freq_from_autocorr(data, len(data))
 
-            fft_peak = freq_from_fft(data, len(data))
-            harmonic = round(fft_peak / approx_bin)
-            peak_bin = fft_peak / harmonic
-
-            # fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_bin)
-
-            # freq_bin = min(peak_bin, fundamental_bin, key=abs)  # FIXME
-            freq_bin = peak_bin
             result_fft = []
 
             for harmonic in range(gauss.nyquist_inclusive(self.nsamp)):
