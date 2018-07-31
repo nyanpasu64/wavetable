@@ -43,7 +43,8 @@ def correlate(fixed, sweep):
     fixed = np.array(fixed)
     sweep = np.array(sweep)
     if fixed.shape != sweep.shape or len(fixed.shape) != 1:
-        raise ValueError('incorrect dimensions: %s versus %s' % (fixed.shape, sweep.shape))
+        raise ValueError(
+            'incorrect dimensions: %s versus %s' % (fixed.shape, sweep.shape))
 
     return ifft(fft(fixed) * fft(sweep).conj()).real
 
@@ -79,6 +80,7 @@ def quantize(a, y=None):
 
 def iround(a):
     return np.round(a).astype(int)
+
 
 class Rescaler:
     def __init__(self, maxrange: int, rounding='quantize', translate=True):
