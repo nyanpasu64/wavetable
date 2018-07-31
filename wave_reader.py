@@ -99,7 +99,7 @@ class WaveReader:
         data = self.raw_at(sample_offset)
         data *= self.window
         phased_data = np.roll(data, len(data) // 2)
-        return np.fft.rfft(phased_data)
+        return fourier.rfft_norm(phased_data)
 
     def wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
         """
