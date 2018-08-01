@@ -3,7 +3,7 @@ import sys
 import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Tuple, Sequence, Optional
+from typing import Tuple, Sequence, Optional, NamedTuple
 
 import numpy as np
 from ruamel.yaml import YAML
@@ -22,6 +22,64 @@ assert transfers    # module used by cfg.transfer
 # np.loge = np.ln = np.log
 
 
+class WaveConfig(NamedTuple):
+    range: Optional[int]
+    vol_range: Optional[int]
+    fps: int
+
+    mode: str
+    fft_mode: str
+    start: int
+    width_frames: int
+    transfer: str
+
+    wav_path: Optional[str]
+    nwave: Optional[int]
+    nsamp: Optional[int]
+    pitch_estimate: Optional[int]
+    at: Optional[str]
+
+    def validate(self):
+        for field in self._fields:
+            if field in ['range', 'vol_range', 'nwave', 'at']:
+                continue
+            if getattr(self, field) is None:
+                raise Exception(f'Missing config parameter {field}')
+
+
+def unrounded_cfg(mapping=None, **kwargs):
+    d = WaveConfig(
+        range=None,
+        vol_range=None,
+        fps=60,
+
+        mode='stft',
+        fft_mode='normal',
+        start=0,
+        width_frames=1,
+        transfer='transfers.Unity()',
+
+        wav_path=None,
+        nwave=None,
+        nsamp=None,
+        pitch_estimate=None,
+        at=None
+    )
+    d = d._replace(**(mapping or {}))
+    d = d._replace(**kwargs)
+    return d
+
+
+def n163_cfg(mapping=None, **kwargs):
+    d = unrounded_cfg(
+        range=16,
+        vol_range=16
+    )
+    d = d._replace(**(mapping or {}))
+    d = d._replace(**kwargs)
+    return d
+
+
 def main(cfg_path):
     cfg_path = Path(cfg_path).resolve()
 
@@ -30,18 +88,20 @@ def main(cfg_path):
         file_cfg = yaml.load(f)
 
     cfg = n163_cfg(file_cfg)
+    cfg.validate()
 
-    wav_path = Path(cfg_path.parent, cfg['file'])
+    wav_path = Path(cfg_path.parent, cfg.wav_path)
     with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
             read = WaveReader(str(wav_path), cfg)
             instr = read.read(cfg.start)
 
-            if 'at' in cfg:
-                at = parse_at(cfg.at)
-                instr = instr[at]
+            # Pick a subset of the waves extracted. (TODO don't subsample pitch/volume)
+            if cfg.at:
+                wave_indices = parse_at(cfg.at)
+                instr = instr[wave_indices]
 
-            note = cfg['pitch_estimate']
+            note = cfg.pitch_estimate
             instr.print(note)
 
 
@@ -72,41 +132,8 @@ def parse_at(at: str):
     return out
 
 
-def unrounded_cfg(mapping={}, **kwargs):
-    d = AttrDict(
-        range=None,
-        vol_range=None,
-        fps=60,
-
-        mode='stft',
-        fft_mode='normal',
-        start=0,
-        width_frames=1,
-        transfer='transfers.Unity()',
-
-        file=None,
-        nwave=None,
-        nsamp=None,
-        pitch_estimate=None,
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
-def n163_cfg(mapping={}, **kwargs):
-    d = unrounded_cfg(
-        range=16,
-        vol_range=16
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
 class WaveReader:
-    def __init__(self, path: str, cfg: dict):
-        cfg = AttrDict(cfg)
+    def __init__(self, path: str, cfg: WaveConfig):
         # TODO: cfg.pop() and ensure no invalid entries
 
         self.path = path
