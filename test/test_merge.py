@@ -41,11 +41,11 @@ def test_correlate():
     sweep = F('0 0 1 2 0 0')
     N = len(sweep)
 
-    assert correlate_offset(fixed, sweep) == 0
+    assert correlate_offset(fixed, sweep) == (0, False)
 
     sweep = F('0 0 0 1 2 0')
     offset = correlate_offset(fixed, sweep)
-    assert offset == N - 1
+    assert offset == (N - 1, False)
 
     assert (np.roll(sweep, offset) == fixed).all()
 
