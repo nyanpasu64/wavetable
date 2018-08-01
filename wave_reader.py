@@ -242,7 +242,7 @@ class WaveReader:
                 # print(begin, end)
                 bands = stft[math.ceil(begin):math.ceil(end)]
                 # TODO if bands are uncorrelated, self.power_sum is better
-                amplitude = np.sum(bands)
+                amplitude = np.sum(bands)   # type: complex
                 if harmonic > 0:
                     amplitude *= self.transfer(harmonic)
                 result_fft.append(amplitude)
