@@ -1,14 +1,14 @@
 import math
-from pathlib import Path
 import sys
 import warnings
 from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Tuple, Sequence, Optional
 
 import numpy as np
 from ruamel.yaml import YAML
 from scipy.io import wavfile
-from waveform_analysis.freq_estimation import freq_from_autocorr, freq_from_fft
+from waveform_analysis.freq_estimation import freq_from_autocorr
 
 from wavetable import fourier, transfers
 from wavetable import gauss
@@ -17,8 +17,91 @@ from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
 from wavetable.wave_util import AttrDict, Rescaler
 
+assert transfers    # module used by cfg.transfer
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 # np.loge = np.ln = np.log
+
+
+def main(cfg_path):
+    cfg_path = Path(cfg_path).resolve()
+
+    yaml = YAML(typ='safe')
+    with open(str(cfg_path)) as f:
+        file_cfg = yaml.load(f)
+
+    cfg = n163_cfg(file_cfg)
+
+    wav_path = Path(cfg_path.parent, cfg['file'])
+    with open(str(cfg_path) + '.txt', 'w') as f:
+        with redirect_stdout(f):
+            read = WaveReader(str(wav_path), cfg)
+            instr = read.read(cfg.start)
+
+            if 'at' in cfg:
+                at = parse_at(cfg.at)
+                instr = instr[at]
+
+            note = cfg['pitch_estimate']
+            instr.print(note)
+
+
+def parse_at(at: str):
+    out = []
+    for word in at.split():
+        try:
+            out.append(int(word, 0))
+            continue
+        except ValueError:
+            pass
+
+        if ':' in word:
+            chunks = [int(pos, 0) if pos else None
+                      for pos in word.split(':')]
+            if len(chunks) == 2:
+                chunks.append(None)
+
+            try:
+                if chunks[1] < chunks[0] and chunks[2] is None:
+                    chunks[2] = -1
+            except TypeError:
+                pass
+
+            out.append(slice(*chunks))
+        else:
+            out.append(word)
+    return out
+
+
+def unrounded_cfg(mapping={}, **kwargs):
+    d = AttrDict(
+        range=None,
+        vol_range=None,
+        fps=60,
+
+        mode='stft',
+        fft_mode='normal',
+        start=0,
+        width_frames=1,
+        transfer='transfers.Unity()',
+
+        file=None,
+        nwave=None,
+        nsamp=None,
+        pitch_estimate=None,
+    )
+    d.update(mapping)
+    d.update(kwargs)
+    return d
+
+
+def n163_cfg(mapping={}, **kwargs):
+    d = unrounded_cfg(
+        range=16,
+        vol_range=16
+    )
+    d.update(mapping)
+    d.update(kwargs)
+    return d
 
 
 class WaveReader:
@@ -99,7 +182,7 @@ class WaveReader:
         data = self.raw_at(sample_offset)
         data *= self.window
         phased_data = np.roll(data, len(data) // 2)
-        return np.fft.rfft(phased_data)
+        return fourier.rfft_norm(phased_data)
 
     def wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
         """
@@ -113,24 +196,16 @@ class WaveReader:
             data = self.raw_at(sample_offset)
             stft = self.stft(sample_offset)
 
-            # Autocorrelation is imprecise.
-            # FFT produces a multiple of the true frequency.
-            # So use a subharmonic of FFT frequency.
-
             if self.freq_estimate:
                 # cyc/s * time/window = cyc/window
                 approx_bin = self.freq_estimate * self.segment_time
+                fft_peak = freq_from_autocorr(data, len(data))
+                harmonic = round(fft_peak / approx_bin)
+                freq_bin = fft_peak / harmonic
+
             else:
-                approx_bin = freq_from_autocorr(data, len(data))
+                freq_bin = freq_from_autocorr(data, len(data))
 
-            fft_peak = freq_from_fft(data, len(data))
-            harmonic = round(fft_peak / approx_bin)
-            peak_bin = fft_peak / harmonic
-
-            # fundamental_bin = freq_from_fft_limited(data, end=1.5*approx_bin)
-
-            # freq_bin = min(peak_bin, fundamental_bin, key=abs)  # FIXME
-            freq_bin = peak_bin
             result_fft = []
 
             for harmonic in range(gauss.nyquist_inclusive(self.nsamp)):
@@ -139,7 +214,8 @@ class WaveReader:
                 end = freq_bin * (harmonic + 0.5)
                 # print(begin, end)
                 bands = stft[math.ceil(begin):math.ceil(end)]
-                amplitude = self.power_sum(bands)
+                # TODO if bands are uncorrelated, self.power_sum is better
+                amplitude = np.sum(bands)
                 if harmonic > 0:
                     amplitude *= self.transfer(harmonic)
                 result_fft.append(amplitude)
@@ -184,88 +260,6 @@ class WaveReader:
         if self.vol_range:
             vols = self.vol_rescaler.rescale(vols)
         return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
-
-
-def unrounded_cfg(mapping={}, **kwargs):
-    d = AttrDict(
-        range=None,
-        vol_range=None,
-        fps=60,
-
-        mode='stft',
-        fft_mode='normal',
-        start=0,
-        width_frames=1,
-        transfer='transfers.Unity()',
-
-        file=None,
-        nwave=None,
-        nsamp=None,
-        pitch_estimate=None,
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
-def n163_cfg(mapping={}, **kwargs):
-    d = unrounded_cfg(
-        range=16,
-        vol_range=16
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
-def parse_at(at: str):
-    out = []
-    for word in at.split():
-        try:
-            out.append(int(word, 0))
-            continue
-        except ValueError:
-            pass
-
-        if ':' in word:
-            chunks = [int(pos, 0) if pos else None
-                      for pos in word.split(':')]
-            if len(chunks) == 2:
-                chunks.append(None)
-
-            try:
-                if chunks[1] < chunks[0] and chunks[2] is None:
-                    chunks[2] = -1
-            except TypeError:
-                pass
-
-            out.append(slice(*chunks))
-        else:
-            out.append(word)
-    return out
-
-
-def main(cfg_path):
-    cfg_path = Path(cfg_path).resolve()
-
-    yaml = YAML(typ='safe')
-    with open(str(cfg_path)) as f:
-        file_cfg = yaml.load(f)
-
-    cfg = n163_cfg(file_cfg)
-
-    wav_path = Path(cfg_path.parent, cfg['file'])
-    with open(str(cfg_path) + '.txt', 'w') as f:
-        with redirect_stdout(f):
-            read = WaveReader(str(wav_path), cfg)
-            instr = read.read(cfg.start)
-
-            if 'at' in cfg:
-                at = parse_at(cfg.at)
-                instr = instr[at]
-
-            note = cfg['pitch_estimate']
-            instr.print(note)
 
 
 if __name__ == '__main__':

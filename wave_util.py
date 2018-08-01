@@ -1,4 +1,6 @@
 import math
+from typing import NamedTuple
+
 import numpy as np
 from numpy.fft import ifft, fft
 
@@ -43,28 +45,38 @@ def correlate(fixed, sweep):
     fixed = np.array(fixed)
     sweep = np.array(sweep)
     if fixed.shape != sweep.shape or len(fixed.shape) != 1:
-        raise ValueError('incorrect dimensions: %s versus %s' % (fixed.shape, sweep.shape))
+        raise ValueError(
+            'incorrect dimensions: %s versus %s' % (fixed.shape, sweep.shape))
 
     return ifft(fft(fixed) * fft(sweep).conj()).real
 
 
-def correlate_offset(fixed, sweep, i=None):
+class Correlation(NamedTuple):
+    offset: int
+    should_invert: bool
+
+
+def correlate_offset(fixed, sweep) -> Correlation:
     """ Get peak correlation offset. """
-
+    # TODO how to handle rounded values? You'd need to know maxval.
     corrs = correlate(fixed, sweep)
-    if np.argmax(abs(corrs)) != np.argmax(corrs):
-        raise ValueError(f'yeah, seems like you need to invert wave {i}')
 
-    offset = np.argmax(corrs)
-    return offset
+    offset = np.argmax(abs(corrs))      # type: int
+    should_invert = (corrs[offset] < 0)
+    return Correlation(offset, should_invert)
 
 
 def align_waves(waveseq):
     """ Returns maximum-correlation copy of waveseq. """
     out = [waveseq[0]]
     for i, wave in enumerate(waveseq[1:], 1):
-        offset = correlate_offset(out[-1], wave, i)
-        out.append(np.roll(wave, offset))
+        state = correlate_offset(out[-1], wave)
+
+        correlated = np.roll(wave, state.offset)
+        if state.should_invert:
+            correlated *= -1
+
+        out.append(correlated)
 
     return out
 
@@ -79,6 +91,7 @@ def quantize(a, y=None):
 
 def iround(a):
     return np.round(a).astype(int)
+
 
 class Rescaler:
     def __init__(self, maxrange: int, rounding='quantize', translate=True):
