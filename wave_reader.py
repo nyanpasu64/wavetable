@@ -3,9 +3,10 @@ import sys
 import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Tuple, Sequence, Optional, NamedTuple
+from typing import Tuple, Sequence, Optional
 
 import numpy as np
+from dataclasses import dataclass, fields, Field, replace
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr
@@ -22,7 +23,9 @@ assert transfers    # module used by cfg.transfer
 # np.loge = np.ln = np.log
 
 
-class WaveConfig(NamedTuple):
+
+@dataclass
+class WaveConfig:
     range: Optional[int]
     vol_range: Optional[int]
     fps: int
@@ -40,11 +43,16 @@ class WaveConfig(NamedTuple):
     at: Optional[str]
 
     def validate(self):
-        for field in self._fields:
+        missing = []
+        for field_obj in fields(self):      # type: Field
+            field = field_obj.name
             if field in ['range', 'vol_range', 'nwave', 'at']:
                 continue
             if getattr(self, field) is None:
-                raise Exception(f'Missing config parameter {field}')
+                missing.append(field)
+
+        if missing:
+            raise Exception(f'Missing config parameters {missing}')
 
 
 def unrounded_cfg(mapping=None, **kwargs):
@@ -65,8 +73,8 @@ def unrounded_cfg(mapping=None, **kwargs):
         pitch_estimate=None,
         at=None
     )
-    d = d._replace(**(mapping or {}))
-    d = d._replace(**kwargs)
+    d = replace(d, **(mapping or {}))
+    d = replace(d, **kwargs)
     return d
 
 
@@ -75,8 +83,8 @@ def n163_cfg(mapping=None, **kwargs):
         range=16,
         vol_range=16
     )
-    d = d._replace(**(mapping or {}))
-    d = d._replace(**kwargs)
+    d = replace(d, **(mapping or {}))
+    d = replace(d, **kwargs)
     return d
 
 
