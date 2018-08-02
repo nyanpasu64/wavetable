@@ -2,7 +2,7 @@ import py.test
 import pytest
 from wavetable.instrument import Instr
 
-from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg
+from wavetable.wave_reader import WaveReader
 
 assert py.test
 
@@ -26,7 +26,7 @@ def cfg(request):
 def test_wave_at(cfg):
     """ Ensures wave is not constant. """
     read = WaveReader(PATH, cfg)
-    wave = read.wave_at(0)[0]
+    wave = read._wave_at(0)[0]
     assert not (wave == wave[0]).all()
 
 
