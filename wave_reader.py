@@ -15,7 +15,7 @@ from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
-from wavetable.util.config import dataclass
+from wavetable.util.config import dataclass, field, InitVar
 from wavetable.wave_util import AttrDict, Rescaler
 
 assert transfers    # module used by cfg.transfer
@@ -29,7 +29,9 @@ class WaveConfig:
     pitch_estimate: int
     nsamp: int
     nwave: Optional[int] = None
-    at: Optional[str] = None
+
+    at: InitVar[str] = ''
+    wave_indices: list = field(init=False)
 
     range: Optional[int] = 16
     vol_range: Optional[int] = 16
@@ -40,26 +42,38 @@ class WaveConfig:
     width_frames: int = 1
     transfer: str = 'transfers.Unity()'
 
+    def __post_init__(self, at):
+        self.wave_indices = parse_at(at or '')
+
+
+def unrounded_cfg(**kwargs):
+    kwargs.setdefault('range', None)
+    kwargs.setdefault('vol_range', None)
+    return WaveConfig(**kwargs)
+
+
+def n163_cfg(**kwargs):
+    return WaveConfig(**kwargs)
+
 
 def main(cfg_path):
     cfg_path = Path(cfg_path).resolve()
+    cfg_dir = cfg_path.parent
 
     yaml = YAML(typ='safe')
-    with open(str(cfg_path)) as f:
+    with cfg_path.open() as f:
         file_cfg = yaml.load(f)
 
     cfg = WaveConfig(**file_cfg)
 
-    wav_path = Path(cfg_path.parent, cfg.wav_path)
     with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
-            read = WaveReader(str(wav_path), cfg)
+            read = WaveReader(cfg_dir, cfg)
             instr = read.read(cfg.start)
 
             # Pick a subset of the waves extracted. (TODO don't subsample pitch/volume)
-            if cfg.at:
-                wave_indices = parse_at(cfg.at)
-                instr = instr[wave_indices]
+            if cfg.wave_indices:
+                instr = instr[cfg.wave_indices]
 
             note = cfg.pitch_estimate
             instr.print(note)
@@ -93,11 +107,13 @@ def parse_at(at: str):
 
 
 class WaveReader:
-    def __init__(self, wav_path: str, cfg: WaveConfig):
-        # TODO: cfg.pop() and ensure no invalid entries
+    def __init__(self, cfg_dir: Path, cfg: WaveConfig):
+        assert cfg_dir.is_dir()
+        self.cfg_dir = cfg_dir
+
+        wav_path = str(cfg_dir / cfg.wav_path)
 
         # Load WAV file
-        self.wav_path = wav_path
         with warnings.catch_warnings():
             # Polyphone SF2 rips contain 'smpl' chunk with loop data
             warnings.simplefilter("ignore")
@@ -145,7 +161,7 @@ class WaveReader:
         if self.vol_range:
             self.vol_rescaler = Rescaler(self.vol_range, translate=False)
 
-    def read(self, start: int = None):
+    def read(self, start: int = None) -> Instr:
         """ For each frame, extract wave_at. """
 
         if start is None:
@@ -161,7 +177,7 @@ class WaveReader:
         sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
         return self.read_at(sample_offsets)
 
-    def read_at(self, sample_offsets: Sequence):
+    def read_at(self, sample_offsets: Sequence) -> Instr:
         wave_seq = []
         freqs = []
         vols = []
