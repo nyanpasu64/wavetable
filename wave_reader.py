@@ -69,7 +69,7 @@ def main(cfg_path):
     with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
             read = WaveReader(cfg_dir, cfg)
-            instr = read.read(cfg.start)
+            instr = read.read()
 
             # Pick a subset of the waves extracted. (TODO don't subsample pitch/volume)
             if cfg.wave_indices:
@@ -108,6 +108,8 @@ def parse_at(at: str):
 
 class WaveReader:
     def __init__(self, cfg_dir: Path, cfg: WaveConfig):
+        self.cfg = cfg
+
         assert cfg_dir.is_dir()
         self.cfg_dir = cfg_dir
 
@@ -127,12 +129,8 @@ class WaveReader:
         else:
             self.freq_estimate = None
 
-        self.nsamp = cfg.nsamp
-        self.nwave = cfg.nwave
-        self.fps = cfg.fps
-        self.frame_time = 1 / self.fps
+        self.frame_time = 1 / cfg.fps
         # self.offset = cfg.get('offset', 0.5)
-        self.start = cfg.start
 
         # STFT parameters
         segment_time = self.frame_time * cfg.width_frames
@@ -153,24 +151,21 @@ class WaveReader:
             raise ValueError(f'fft_mode=[zoh, normal] (you supplied {fft_mode})')
 
         # Rescaling parameters
-        self.range = cfg.range  # type: Optional[int]
-        if self.range:
-            self.rescaler = Rescaler(self.range)
+        if cfg.range:
+            self.rescaler = Rescaler(cfg.range)
 
-        self.vol_range = cfg.vol_range
-        if self.vol_range:
-            self.vol_rescaler = Rescaler(self.vol_range, translate=False)
+        if cfg.vol_range:
+            self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
 
-    def read(self, start: int = None) -> Instr:
+    def read(self) -> Instr:
         """ For each frame, extract wave_at. """
 
-        if start is None:
-            start = self.start
+        start = self.cfg.start
 
         frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
         start_samp = start * frame_dsamp
-        if self.nwave:
-            stop_samp = (start + self.nwave) * frame_dsamp
+        if self.cfg.nwave:
+            stop_samp = (start + self.cfg.nwave) * frame_dsamp
         else:
             stop_samp = len(self.wav)
 
@@ -188,7 +183,7 @@ class WaveReader:
             vols.append(peak)
 
         wave_seq = wave_util.align_waves(wave_seq)
-        if self.vol_range:
+        if self.cfg.vol_range:
             vols = self.vol_rescaler.rescale(vols)
         return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
 
@@ -215,7 +210,7 @@ class WaveReader:
 
         result_fft = []
 
-        for harmonic in range(gauss.nyquist_inclusive(self.nsamp)):
+        for harmonic in range(gauss.nyquist_inclusive(self.cfg.nsamp)):
             # print(harmonic)
             begin = freq_bin * (harmonic - 0.5)
             end = freq_bin * (harmonic + 0.5)
@@ -228,7 +223,7 @@ class WaveReader:
             result_fft.append(amplitude)
 
         wave = self.irfft(result_fft)
-        if self.range:
+        if self.cfg.range:
             wave, peak = self.rescaler.rescale_peak(wave)
         else:
             peak = 1
