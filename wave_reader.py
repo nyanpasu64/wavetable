@@ -71,10 +71,6 @@ def main(cfg_path):
             read = WaveReader(cfg_dir, cfg)
             instr = read.read()
 
-            # Pick a subset of the waves extracted. (TODO don't subsample pitch/volume)
-            if cfg.wave_indices:
-                instr = instr[cfg.wave_indices]
-
             note = cfg.pitch_estimate
             instr.print(note)
 
@@ -170,7 +166,12 @@ class WaveReader:
             stop_samp = len(self.wav)
 
         sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
-        return self.read_at(sample_offsets)
+        instr = self.read_at(sample_offsets)
+
+        # Pick a subset of the waves extracted. (TODO don't subsample pitch/volume)
+        if self.cfg.wave_indices:
+            instr = instr[self.cfg.wave_indices]
+        return instr
 
     def read_at(self, sample_offsets: Sequence) -> Instr:
         wave_seq = []
