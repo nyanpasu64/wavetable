@@ -190,8 +190,8 @@ class BrrEncoder:
 
             # Write loop points and data.
             header_data = byte_offset.to_bytes(2, 'little') + data
-            brr_file.truncate()
             brr_file.seek(0)
+            brr_file.truncate()
             brr_file.write(header_data)
 
         # Parse output: actual BRR resampling ratio
