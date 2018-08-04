@@ -2,7 +2,7 @@ import re
 import subprocess
 from fractions import Fraction
 from pathlib import Path
-from typing import Sequence, Optional
+from typing import Sequence, Optional, Pattern, AnyStr
 
 import click
 import numpy as np
@@ -180,7 +180,7 @@ class BrrEncoder:
         byte_offset = loop_idx * 9
 
         # Write loop points into file.
-        with self.brr_path.open('rb') as brr_file:
+        with self.brr_path.open('r+b') as brr_file:
             data = brr_file.read()
 
             # Remove data before loop point.
@@ -195,9 +195,8 @@ class BrrEncoder:
             brr_file.write(header_data)
 
         # Parse output: actual BRR resampling ratio
-        wav2brr_ratio = 1 / Fraction(self.RECIPROCAL_RATIO_REGEX.search(output).group(1))
+        wav2brr_ratio = 1 / Fraction(search(self.RECIPROCAL_RATIO_REGEX, output))
         return wav2brr_ratio
-
 
     def _get_args(self):
         cfg = self.cfg
@@ -211,9 +210,9 @@ class BrrEncoder:
 
         # Loop and truncate
         if cfg.loop is not None:
-            args[0:0] = ['-l' + str(cfg.loop)]
+            args += ['-l' + str(cfg.loop)]
         if cfg.truncate is not None:
-            args[0:0] = ['-t' + str(cfg.truncate)]
+            args += ['-t' + str(cfg.truncate)]
 
         # Resample
         # Even if ratio=1, encoder may resample slightly, to ensure looped is
@@ -226,10 +225,14 @@ class BrrEncoder:
         if cfg.volume != 1.0:
             args += [f'-a{cfg.volume}']
 
+        # paths
+        args += [str(self.wav_path), str(self.brr_path)]
+
+        assert args[0] == self.CMD
         return args
 
 
-def search(regex, s):
+def search(regex: Pattern, s: AnyStr) -> AnyStr:
     return regex.search(s).group(1)
 
 
