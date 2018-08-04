@@ -58,6 +58,7 @@ class WavetableConfig(WaveConfig):
 
 DTYPE = np.int16
 SAMPLE_RATE = 32000     # Doesn't actually matter for output BRR files.
+WAV_SUBDIR = 'temp-wav'
 
 
 def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
@@ -69,7 +70,22 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
     The BRR file loops WAV[unlooped_prefix:].
     """
 
-    # Load file config
+    # Initialize directories
+    cfg_name = cfg_path.stem
+
+    cfg_dir = cfg_path.parent   # type: Path
+    wav_dir = cfg_dir / WAV_SUBDIR
+    brr_dir = global_cfg.dest_dir
+
+    wav_dir.mkdir(exist_ok=True)
+
+    for file in wav_dir.glob(f'{cfg_name}-*'):
+        file.unlink()
+
+    for file in brr_dir.glob(f'{cfg_name}-*'):
+        file.unlink()
+
+    # Load config file
     file_cfg: dict = yaml.load(cfg_path)
     file_cfg.setdefault('range', None)
     file_cfg.setdefault('vol_range', None)
@@ -81,11 +97,6 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
     truncate_prefix = cfg.truncate_prefix
     gaussian = cfg.gaussian
 
-    # Compute cfg-global parameters
-    cfg_name = cfg_path.stem
-    cfg_dir = cfg_path.parent
-    brr_dir = global_cfg.dest_dir
-
     brr_cfg = BrrConfig(
         gaussian=gaussian,
         loop=unlooped_prefix,
@@ -95,19 +106,10 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
     wr = WaveReader(cfg_path.parent, cfg)
     instr = wr.read()
 
-    # # TODO wav_dir brr_dir
-    # # TODO clear all waves with name
-    # # TODO clear all brrs with name
-    #
-    # wav_dir = get_wav_path(cfg_dir, '').parent      # type: Path
-    # for wav in wav_dir.glob(f'{cfg_name}-*.wav'):
-    #     wav.unlink()
-
     for i, wave in enumerate(instr.waveseq):
         wave_name = f'{cfg_name}-{i:03}'
-        wav_path = get_wav_path(cfg_dir, wave_name)
-        brr_path = get_brr_path(brr_dir, wave_name)
 
+        wav_path = (wav_dir / wave_name).with_suffix('.wav')
         wav_path.parent.mkdir(exist_ok=True)
 
         # Write WAV file
@@ -120,6 +122,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
             continue
 
         # Encode BRR file
+        brr_path = (brr_dir / wave_name).with_suffix('.brr')
         brr = BrrEncoder(brr_cfg, wav_path, brr_path)
 
         # The first sample's "prefix" is used. When we switch loop points to subsequent
@@ -128,17 +131,6 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
             brr.write(behead=True)
         else:
             brr.write()
-
-
-SUBDIR = 'temp-wav'
-
-
-def get_wav_path(prefix: Path, wave_name: str) -> Path:
-    return prefix / SUBDIR / (wave_name + '.wav')
-
-
-def get_brr_path(brr_dir: Path, wave_name: str) -> Path:
-    return brr_dir / (wave_name + '.brr')
 
 
 @dataclass
