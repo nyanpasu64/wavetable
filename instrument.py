@@ -108,6 +108,10 @@ class MML(np.ndarray):
 
 class Instr:
     seqs = ['wave_inds', 'vols', 'freqs']
+    waveseq: List[np.ndarray]
+    wave_inds: np.ndarray
+    vols: np.ndarray
+    freqs: np.ndarray
 
     def __init__(self, waveseq: List[np.array], cfg: dict = None, **kwargs):
         cfg = AttrDict(cfg, **kwargs)
@@ -123,32 +127,6 @@ class Instr:
             seq = getattr(self, seq_key)
             if seq is not None:
                 setattr(self, seq_key, np.array(seq).view(MML))
-
-    def print_waves(self):
-        strs = [S(wave) for wave in self.waveseq]
-        print(';\n'.join(strs))
-        print()
-
-        wave_inds = self.wave_inds
-        print(S(wave_inds))
-        print()
-
-    def print_freqs(self, note, tranpose_factor=1):
-        pitch = [freq2pitch(freq * tranpose_factor, note) for freq in self.freqs]
-        print('pitch')
-        print(S(pitch))
-        print()
-
-    def print(self, *args):
-        self.print_waves()
-
-        if self.vols is not None:
-            print('vols:')
-            print(S(self.vols))
-            print()
-
-        if self.freqs is not None:
-            self.print_freqs(*args)
 
     def __getitem__(self, get):
         inds = []
@@ -178,6 +156,32 @@ class Instr:
             setattr(sub_instr, seq_key, seq)
 
         return sub_instr
+
+    def print(self, *args):
+        self.print_waves()
+
+        if self.vols is not None:
+            print('vols:')
+            print(S(self.vols))
+            print()
+
+        if self.freqs is not None:
+            self.print_freqs(*args)
+
+    def print_waves(self):
+        strs = [S(wave) for wave in self.waveseq]
+        print(';\n'.join(strs))
+        print()
+
+        wave_inds = self.wave_inds
+        print(S(wave_inds))
+        print()
+
+    def print_freqs(self, note, tranpose_factor=1):
+        pitch = [freq2pitch(freq * tranpose_factor, note) for freq in self.freqs]
+        print('pitch')
+        print(S(pitch))
+        print()
 
 
 def deduplicate(instr: Instr):
