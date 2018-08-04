@@ -146,12 +146,12 @@ class BrrConfig:
 
 
 class BrrEncoder:
-    CMD = 'brr_encoder'
-    LOOP_REGEX = re.compile(
+    _CMD = 'brr_encoder'
+    _LOOP_REGEX = re.compile(
         r'^Position of the loop within the BRR sample : \d+ samples = (\d+) BRR blocks\.',
         re.MULTILINE
     )
-    RECIPROCAL_RATIO_REGEX = re.compile(
+    _RECIPROCAL_RATIO_REGEX = re.compile(
         r'Resampling by effective ratio of ([\d.]+)\.\.\.', re.MULTILINE)
     # Do not remove the trailing ellipses. That will hide bugs where the resampling
     # ratio is not extracted correctly (eg. truncated at the decimal point).
@@ -174,7 +174,7 @@ class BrrEncoder:
 
         # Parse output: loop points
         if self.cfg.loop is not None:
-            loop_idx = int(search(self.LOOP_REGEX, output))
+            loop_idx = int(search(self._LOOP_REGEX, output))
         else:
             loop_idx = 0
         byte_offset = loop_idx * 9
@@ -195,12 +195,12 @@ class BrrEncoder:
             brr_file.write(header_data)
 
         # Parse output: actual BRR resampling ratio
-        wav2brr_ratio = 1 / Fraction(search(self.RECIPROCAL_RATIO_REGEX, output))
+        wav2brr_ratio = 1 / Fraction(search(self._RECIPROCAL_RATIO_REGEX, output))
         return wav2brr_ratio
 
     def _get_args(self):
         cfg = self.cfg
-        args = [self.CMD]
+        args = [self._CMD]
 
         if cfg.gaussian:
             args += ['-g']
@@ -228,7 +228,7 @@ class BrrEncoder:
         # paths
         args += [str(self.wav_path), str(self.brr_path)]
 
-        assert args[0] == self.CMD
+        assert args[0] == self._CMD
         return args
 
 
