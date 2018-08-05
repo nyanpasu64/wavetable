@@ -63,12 +63,15 @@ WAV_SUBDIR = 'temp-wav'
 
 def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
     """
-    Reads cfg_path. Writes intermediate wav files to a subdirectory of cfg_path,
-    and writes brr files to global_cfg.dest_dir.
+    Reads cfg_path.
+    Writes intermediate wav files to `cfg_dir/WAV_SUBDIR/cfg-012.wav`.
+    Writes brr files to `global_cfg.dest_dir/cfg-012.brr`.
 
     The WAV file contains data + data[:unlooped_prefix].
     The BRR file loops WAV[unlooped_prefix:].
     """
+    if not cfg_path.is_file():
+        raise ValueError(f'invalid cfg_path {cfg_path}, is not file')
 
     # Initialize directories
     cfg_name = cfg_path.stem
@@ -102,7 +105,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
         loop=unlooped_prefix,
     )
 
-    # Load input
+    # Generate wavetables
     wr = WaveReader(cfg_path.parent, cfg)
     instr = wr.read()
 
@@ -161,6 +164,11 @@ class BrrEncoder:
         self.wav_path = wav_path
         self.brr_path = brr_path
 
+        if not wav_path.is_file():
+            raise ValueError(f'invalid wav_path {wav_path}, is not file')
+        if brr_path.is_dir():
+            raise ValueError(f'invalid brr_path {brr_path}, is dir')
+
     def write(self, behead=False) -> float:
         """ Writes a BRR file, returns actual resampling ratio """
         args = self._get_args()
@@ -170,6 +178,7 @@ class BrrEncoder:
             args, stdout=subprocess.PIPE,
             universal_newlines=True, encoding='latin-1'
         )
+        result.check_returncode()
         output = result.stdout      # type: str
 
         # Parse output: loop points
