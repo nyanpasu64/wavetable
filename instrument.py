@@ -107,7 +107,7 @@ class MML(np.ndarray):
 
 
 class Instr:
-    seqs = ['wave_inds', 'vols', 'freqs']
+    SEQS = ['wave_inds', 'vols', 'freqs']
     waveseq: List[np.ndarray]
     wave_inds: np.ndarray
     vols: np.ndarray
@@ -123,7 +123,7 @@ class Instr:
         self.vols = cfg.get('vols', None)
         self.freqs = cfg.get('freqs', None)
 
-        for seq_key in self.seqs:
+        for seq_key in self.SEQS:
             seq = getattr(self, seq_key)
             if seq is not None:
                 setattr(self, seq_key, np.array(seq).view(MML))
@@ -147,7 +147,7 @@ class Instr:
         end = max(inds) + 1
 
         sub_instr = Instr(self.waveseq[:end])
-        for seq_key in self.seqs:
+        for seq_key in self.SEQS:
             seq = getattr(self, seq_key)
             if seq is not None:
                 seq = seq[inds]  # .view(MML) # type: MML

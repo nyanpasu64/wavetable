@@ -61,8 +61,7 @@ def main(cfg_path):
     cfg_dir = cfg_path.parent
 
     yaml = YAML(typ='safe')
-    with cfg_path.open() as f:
-        file_cfg = yaml.load(f)
+    file_cfg = yaml.load(cfg_path)
 
     cfg = WaveConfig(**file_cfg)
 

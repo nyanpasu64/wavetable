@@ -61,8 +61,7 @@ def test_wav_brr():
 
         # Ensure existing waves are deleted.
         for nwave in [2, 1]:
-            with cfg_path.open('w') as f:
-                yaml.dump(get_cfg_dict(nwave), f)
+            yaml.dump(get_cfg_dict(nwave), cfg_path)
 
             process_cfg(global_cfg, cfg_path)
 
