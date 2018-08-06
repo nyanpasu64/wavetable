@@ -15,7 +15,7 @@ from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
-from wavetable.util.config import dataclass, field, InitVar
+from dataclasses import dataclass, field, InitVar
 from wavetable.wave_util import AttrDict, Rescaler
 
 assert transfers    # module used by cfg.transfer

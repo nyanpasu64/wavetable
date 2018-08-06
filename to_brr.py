@@ -9,7 +9,7 @@ import numpy as np
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 
-from wavetable.util.config import dataclass
+from dataclasses import dataclass
 from wavetable.wave_reader import WaveReader, WaveConfig
 
 
