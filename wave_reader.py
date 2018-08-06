@@ -15,6 +15,7 @@ from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr
 from wavetable.playback import pitch2freq
+from wavetable.util.config import dataclass, field, InitVar
 from wavetable.wave_util import AttrDict, Rescaler
 
 assert transfers    # module used by cfg.transfer
@@ -22,26 +23,55 @@ assert transfers    # module used by cfg.transfer
 # np.loge = np.ln = np.log
 
 
+@dataclass
+class WaveConfig:
+    wav_path: str
+    pitch_estimate: int
+    nsamp: int
+    nwave: Optional[int] = None
+
+    at: InitVar[str] = ''
+    wave_indices: list = field(init=False)
+
+    range: Optional[int] = 16
+    vol_range: Optional[int] = 16
+    fps: int = 60
+
+    fft_mode: str = 'normal'
+    start: int = 0
+    width_frames: int = 1
+    transfer: str = 'transfers.Unity()'
+
+    def __post_init__(self, at):
+        self.wave_indices = parse_at(at or '')
+
+
+def unrounded_cfg(**kwargs):
+    kwargs.setdefault('range', None)
+    kwargs.setdefault('vol_range', None)
+    return WaveConfig(**kwargs)
+
+
+def n163_cfg(**kwargs):
+    return WaveConfig(**kwargs)
+
+
 def main(cfg_path):
     cfg_path = Path(cfg_path).resolve()
+    cfg_dir = cfg_path.parent
 
     yaml = YAML(typ='safe')
-    with open(str(cfg_path)) as f:
+    with cfg_path.open() as f:
         file_cfg = yaml.load(f)
 
-    cfg = n163_cfg(file_cfg)
+    cfg = WaveConfig(**file_cfg)
 
-    wav_path = Path(cfg_path.parent, cfg['file'])
     with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
-            read = WaveReader(str(wav_path), cfg)
-            instr = read.read(cfg.start)
+            read = WaveReader(cfg_dir, cfg)
+            instr = read.read()
 
-            if 'at' in cfg:
-                at = parse_at(cfg.at)
-                instr = instr[at]
-
-            note = cfg['pitch_estimate']
+            note = cfg.pitch_estimate
             instr.print(note)
 
 
@@ -72,92 +102,149 @@ def parse_at(at: str):
     return out
 
 
-def unrounded_cfg(mapping={}, **kwargs):
-    d = AttrDict(
-        range=None,
-        vol_range=None,
-        fps=60,
-
-        mode='stft',
-        fft_mode='normal',
-        start=0,
-        width_frames=1,
-        transfer='transfers.Unity()',
-
-        file=None,
-        nwave=None,
-        nsamp=None,
-        pitch_estimate=None,
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
-def n163_cfg(mapping={}, **kwargs):
-    d = unrounded_cfg(
-        range=16,
-        vol_range=16
-    )
-    d.update(mapping)
-    d.update(kwargs)
-    return d
-
-
 class WaveReader:
-    def __init__(self, path: str, cfg: dict):
-        cfg = AttrDict(cfg)
-        # TODO: cfg.pop() and ensure no invalid entries
+    def __init__(self, cfg_dir: Path, cfg: WaveConfig):
+        self.cfg = cfg
 
-        self.path = path
+        assert cfg_dir.is_dir()
+        self.cfg_dir = cfg_dir
+
+        wav_path = str(cfg_dir / cfg.wav_path)
+
+        # Load WAV file
         with warnings.catch_warnings():
             # Polyphone SF2 rips contain 'smpl' chunk with loop data
             warnings.simplefilter("ignore")
-            self.sr, self.wav = wavfile.read(path)  # type: int, np.ndarray
+            self.sr, self.wav = wavfile.read(wav_path)  # type: int, np.ndarray
             if self.wav.ndim > 1:
-                self.wav = self.wav[:, 0]
+                self.wav = self.wav[:, 0]   # TODO power_merge stereo samples
 
-        self.wav = self.wav.astype(float)
+        self.wav = self.wav.astype(float)   # TODO divide by peak
         if cfg.pitch_estimate:
             self.freq_estimate = pitch2freq(cfg.pitch_estimate)
         else:
             self.freq_estimate = None
 
-        self.nsamp = cfg.nsamp
-        self.nwave = cfg.nwave
-        self.fps = cfg.fps
-        self.frame_time = 1 / self.fps
+        self.frame_time = 1 / cfg.fps
         # self.offset = cfg.get('offset', 0.5)
-        self.start = cfg.start
 
-        self.mode = cfg.mode
-        if self.mode == 'stft':
-            segment_time = self.frame_time * cfg.width_frames
-            self.segment_smp = self.s_t(segment_time)
-            self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
-            self.segment_time = self.t_s(self.segment_smp)
+        # STFT parameters
+        segment_time = self.frame_time * cfg.width_frames
+        self.segment_smp = self.s_t(segment_time)
+        self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
+        self.segment_time = self.t_s(self.segment_smp)
 
-            self.window = np.hanning(self.segment_smp)
-            self.power_sum = wave_util.power_merge
-            self.transfer = eval(cfg.transfer)
+        self.window = np.hanning(self.segment_smp)
+        self.power_sum = wave_util.power_merge
+        self.transfer = eval(cfg.transfer)
 
-            fft_mode = cfg.fft_mode
-            if fft_mode == 'normal':
-                self.irfft = fourier.irfft_norm
-            elif fft_mode == 'zoh':
-                self.irfft = fourier.irfft_zoh
-            else:
-                raise ValueError(f'fft_mode=[zoh, normal] (you supplied {fft_mode})')
+        fft_mode = cfg.fft_mode
+        if fft_mode == 'normal':
+            self.irfft = fourier.irfft_norm
+        elif fft_mode == 'zoh':
+            self.irfft = fourier.irfft_zoh
         else:
-            raise ValueError('only mode=stft only supported')
+            raise ValueError(f'fft_mode=[zoh, normal] (you supplied {fft_mode})')
 
-        self.range = cfg.range  # type: Optional[int]
-        if self.range:
-            self.rescaler = Rescaler(self.range)
+        # Rescaling parameters
+        if cfg.range:
+            self.rescaler = Rescaler(cfg.range)
 
-        self.vol_range = cfg.vol_range
-        if self.vol_range:
-            self.vol_rescaler = Rescaler(self.vol_range, translate=False)
+        if cfg.vol_range:
+            self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
+
+    def read(self) -> Instr:
+        """ For each frame, extract wave_at. """
+
+        start = self.cfg.start
+
+        frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
+        start_samp = start * frame_dsamp
+        if self.cfg.nwave:
+            stop_samp = (start + self.cfg.nwave) * frame_dsamp
+        else:
+            stop_samp = len(self.wav)
+
+        sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
+        instr = self.read_at(sample_offsets)
+
+        # Pick a subset of the waves extracted. (TODO don't subsample pitch/volume)
+        if self.cfg.wave_indices:
+            instr = instr[self.cfg.wave_indices]
+        return instr
+
+    def read_at(self, sample_offsets: Sequence) -> Instr:
+        wave_seq = []
+        freqs = []
+        vols = []
+        for offset in sample_offsets:
+            wave, freq, peak = self._wave_at(offset)
+            wave_seq.append(wave)
+            freqs.append(freq)
+            vols.append(peak)
+
+        wave_seq = wave_util.align_waves(wave_seq)
+        if self.cfg.vol_range:
+            vols = self.vol_rescaler.rescale(vols)
+        return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
+
+    def _wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
+        """
+        :param sample_offset: offset
+        :return: (wave, freq, volume)
+        """
+
+        # Get STFT. Extract ~~power~~ from bins into new waveform's Fourier buffer.
+
+        data = self.raw_at(sample_offset)
+        stft = self.stft(sample_offset)
+
+        if self.freq_estimate:
+            # cyc/s * time/window = cyc/window
+            approx_bin = self.freq_estimate * self.segment_time
+            fft_peak = freq_from_autocorr(data, len(data))
+            harmonic = round(fft_peak / approx_bin)
+            freq_bin = fft_peak / harmonic
+
+        else:
+            freq_bin = freq_from_autocorr(data, len(data))
+
+        result_fft = []
+
+        for harmonic in range(gauss.nyquist_inclusive(self.cfg.nsamp)):
+            # print(harmonic)
+            begin = freq_bin * (harmonic - 0.5)
+            end = freq_bin * (harmonic + 0.5)
+            # print(begin, end)
+            bands = stft[math.ceil(begin):math.ceil(end)]
+            # TODO if bands are uncorrelated, self.power_sum is better
+            amplitude = np.sum(bands)   # type: complex
+            if harmonic > 0:
+                amplitude *= self.transfer(harmonic)
+            result_fft.append(amplitude)
+
+        wave = self.irfft(result_fft)
+        if self.cfg.range:
+            wave, peak = self.rescaler.rescale_peak(wave)
+        else:
+            peak = 1
+
+        freq_hz = freq_bin / len(data) * self.sr
+
+        return wave, freq_hz, peak
+
+    def stft(self, sample_offset):
+        """ Phasor phases will match center of data, or peak of window. """
+        data = self.raw_at(sample_offset)
+        data *= self.window
+        phased_data = np.roll(data, len(data) // 2)
+        return fourier.rfft_norm(phased_data)
+
+    def raw_at(self, sample_offset):
+        if sample_offset + self.segment_smp >= len(self.wav):
+            sample_offset = len(self.wav) - self.segment_smp
+        data = self.wav[sample_offset:sample_offset + self.segment_smp]  # type: np.ndarray
+        return data.copy()
 
     def s_t(self, time):
         return int(time * self.sr)
@@ -170,96 +257,6 @@ class WaveReader:
 
     def t_s(self, sample):
         return sample / self.sr
-
-    def raw_at(self, sample_offset):
-        if sample_offset + self.segment_smp >= len(self.wav):
-            sample_offset = len(self.wav) - self.segment_smp
-        data = self.wav[sample_offset:sample_offset + self.segment_smp]  # type: np.ndarray
-        return data.copy()
-
-    def stft(self, sample_offset):
-        """ Phasor phases will match center of data, or peak of window. """
-        data = self.raw_at(sample_offset)
-        data *= self.window
-        phased_data = np.roll(data, len(data) // 2)
-        return fourier.rfft_norm(phased_data)
-
-    def wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
-        """
-        :param sample_offset: offset
-        :return: (wave, freq, volume)
-        """
-
-        if self.mode == 'stft':
-            # Get STFT. Extract ~~power~~ from bins into new waveform's Fourier buffer.
-
-            data = self.raw_at(sample_offset)
-            stft = self.stft(sample_offset)
-
-            if self.freq_estimate:
-                # cyc/s * time/window = cyc/window
-                approx_bin = self.freq_estimate * self.segment_time
-                fft_peak = freq_from_autocorr(data, len(data))
-                harmonic = round(fft_peak / approx_bin)
-                freq_bin = fft_peak / harmonic
-
-            else:
-                freq_bin = freq_from_autocorr(data, len(data))
-
-            result_fft = []
-
-            for harmonic in range(gauss.nyquist_inclusive(self.nsamp)):
-                # print(harmonic)
-                begin = freq_bin * (harmonic - 0.5)
-                end = freq_bin * (harmonic + 0.5)
-                # print(begin, end)
-                bands = stft[math.ceil(begin):math.ceil(end)]
-                # TODO if bands are uncorrelated, self.power_sum is better
-                amplitude = np.sum(bands)
-                if harmonic > 0:
-                    amplitude *= self.transfer(harmonic)
-                result_fft.append(amplitude)
-
-            wave = self.irfft(result_fft)
-            if self.range:
-                wave, peak = self.rescaler.rescale_peak(wave)
-            else:
-                peak = 1
-
-            freq_hz = freq_bin / len(data) * self.sr
-
-            return wave, freq_hz, peak
-
-    def read(self, start: int = None):
-        """ For each frame, extract wave_at. """
-
-        if start is None:
-            start = self.start
-
-        frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
-        start_samp = start * frame_dsamp
-        if self.nwave:
-            stop_samp = (start + self.nwave) * frame_dsamp
-        else:
-            stop_samp = len(self.wav)
-
-        sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
-        return self.read_at(sample_offsets)
-
-    def read_at(self, sample_offsets: Sequence):
-        wave_seq = []
-        freqs = []
-        vols = []
-        for offset in sample_offsets:
-            wave, freq, peak = self.wave_at(offset)
-            wave_seq.append(wave)
-            freqs.append(freq)
-            vols.append(peak)
-
-        wave_seq = wave_util.align_waves(wave_seq)
-        if self.vol_range:
-            vols = self.vol_rescaler.rescale(vols)
-        return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
 
 
 if __name__ == '__main__':
