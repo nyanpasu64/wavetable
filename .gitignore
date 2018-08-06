@@ -165,6 +165,6 @@ fabric.properties
 
 *.ipynb
 
-test_waves/*.wtcfg
-test_waves/temp-wav
-test_waves/dest
+*/test_waves/*.wtcfg
+*/test_waves/temp-wav
+*/test_waves/dest
