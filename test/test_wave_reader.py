@@ -1,3 +1,5 @@
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 
 import py.test
@@ -56,10 +58,14 @@ def test_reader_instr(read):
     instr = read.read()
     assert isinstance(instr, Instr)
 
-    instr.print(2, True)
+    with io.StringIO() as dummy_stdout, \
+            redirect_stdout(dummy_stdout):
+        instr.print(2, True)
 
 
 def test_subset(read):
     instr = read.read()
     sub = instr[:20, 20:10:-1]
-    sub.print(74)
+    with io.StringIO() as dummy_stdout, \
+            redirect_stdout(dummy_stdout):
+        sub.print(74)

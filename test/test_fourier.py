@@ -60,8 +60,6 @@ def test_integration():
 def test_multiscale():
     short = rfft_zoh(pulse).real
     long = rfft_zoh(long_pulse).real
-    print(short)
-    print(long)
     assert_close(short, long[:len(short)])
 
 
