@@ -2,14 +2,14 @@ import re
 import subprocess
 from fractions import Fraction
 from pathlib import Path
-from typing import Sequence, Optional, Pattern, AnyStr
+from typing import Sequence, Optional, Pattern, AnyStr, List
 
 import click
 import numpy as np
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from wavetable.wave_reader import WaveReader, WaveConfig
 
 
@@ -22,6 +22,7 @@ yaml = YAML()
 
 Folder = click.Path(exists=True, file_okay=False)
 CFG_EXT = '.wtcfg'
+WAVETABLE_PATH = Path('wavetable.yaml')
 
 
 @click.command()
@@ -44,8 +45,19 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
         if not cfgs:
             raise click.ClickException(f'Wave directory {wav_dir} has no .cfg files')
 
+        metadata_list: List[dict] = []
+
+        # wave_fps: 30
+        # pitch_fps: 90
+        # pitches: [60.1, 60.2...]
+
+        # Process each .cfg file.
         for cfg_path in cfgs:
-            process_cfg(global_cfg, cfg_path)
+            metadata = process_cfg(global_cfg, cfg_path)
+            metadata_list.append(asdict(metadata))
+
+        # Wavetable metadata file
+        yaml.dump(metadata_list, WAVETABLE_PATH)
 
 
 @dataclass
@@ -56,12 +68,19 @@ class WavetableConfig(WaveConfig):
     gaussian: bool = True
 
 
+@dataclass
+class WavetableMetadata:
+    wave_fps: int
+    pitch_fps: int
+    pitches: List[float]
+
+
 DTYPE = np.int16
 SAMPLE_RATE = 32000     # Doesn't actually matter for output BRR files.
 WAV_SUBDIR = 'temp-wav'
 
 
-def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path):
+def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadata:
     """
     Reads cfg_path.
     Writes intermediate wav files to `cfg_dir/WAV_SUBDIR/cfg-012.wav`.
@@ -146,6 +165,7 @@ class BrrConfig:
 
     gaussian: bool = True
     nowrap: bool = True
+
 
 
 class BrrEncoder:
