@@ -10,8 +10,8 @@ from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg
 
 assert py.test
 
+CFG_DIR = Path('tests')
 WAV_PATH = Path('test_waves/Sample 19.wav')
-CFG_DIR = Path()
 NSAMP = 128
 NWAVE = 30
 

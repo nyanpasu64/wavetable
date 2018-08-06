@@ -40,7 +40,7 @@ def test_wav_brr():
     and writes brr files to global_cfg.dest_dir.
     """
 
-    with pushd('test_waves'):
+    with pushd('tests/test_waves'):
         global_cfg = ExtractorConfig(dest_dir=Path('dest'))
 
         name = '19'
