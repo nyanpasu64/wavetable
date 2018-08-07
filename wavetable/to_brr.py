@@ -11,6 +11,7 @@ from scipy.io import wavfile
 
 from dataclasses import dataclass, asdict
 from wavetable.wave_reader import WaveReader, WaveConfig
+from wavetable.wave_util import freq2midi
 
 
 @dataclass
@@ -154,6 +155,15 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
         else:
             brr.write()
 
+    # Generate metadata
+
+    pitches: List[float] = freq2midi(instr.freqs).tolist()
+
+    return WavetableMetadata(
+        wave_fps=cfg.wave_fps,
+        pitch_fps=cfg.pitch_fps,
+        pitches=pitches
+    )
 
 @dataclass
 class BrrConfig:

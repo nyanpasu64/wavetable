@@ -23,6 +23,24 @@ assert transfers    # module used by cfg.transfer
 # np.loge = np.ln = np.log
 
 
+def main(cfg_path):
+    cfg_path = Path(cfg_path).resolve()
+    cfg_dir = cfg_path.parent
+
+    yaml = YAML(typ='safe')
+    file_cfg = yaml.load(cfg_path)
+
+    cfg = WaveConfig(**file_cfg)
+
+    with open(str(cfg_path) + '.txt', 'w') as f:
+        with redirect_stdout(f):
+            read = WaveReader(cfg_dir, cfg)
+            instr = read.read()
+
+            note = cfg.pitch_estimate
+            instr.print(note)
+
+
 @dataclass
 class WaveConfig:
     wav_path: str
@@ -44,34 +62,6 @@ class WaveConfig:
 
     def __post_init__(self, at):
         self.wave_indices = parse_at(at or '')
-
-
-def unrounded_cfg(**kwargs):
-    kwargs.setdefault('range', None)
-    kwargs.setdefault('vol_range', None)
-    return WaveConfig(**kwargs)
-
-
-def n163_cfg(**kwargs):
-    return WaveConfig(**kwargs)
-
-
-def main(cfg_path):
-    cfg_path = Path(cfg_path).resolve()
-    cfg_dir = cfg_path.parent
-
-    yaml = YAML(typ='safe')
-    file_cfg = yaml.load(cfg_path)
-
-    cfg = WaveConfig(**file_cfg)
-
-    with open(str(cfg_path) + '.txt', 'w') as f:
-        with redirect_stdout(f):
-            read = WaveReader(cfg_dir, cfg)
-            instr = read.read()
-
-            note = cfg.pitch_estimate
-            instr.print(note)
 
 
 def parse_at(at: str):
@@ -99,6 +89,16 @@ def parse_at(at: str):
         else:
             out.append(word)
     return out
+
+
+def unrounded_cfg(**kwargs):
+    kwargs.setdefault('range', None)
+    kwargs.setdefault('vol_range', None)
+    return WaveConfig(**kwargs)
+
+
+def n163_cfg(**kwargs):
+    return WaveConfig(**kwargs)
 
 
 class WaveReader:
