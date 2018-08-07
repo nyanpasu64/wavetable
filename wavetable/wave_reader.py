@@ -14,7 +14,7 @@ from wavetable import fourier, transfers
 from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr
-from wavetable.playback import pitch2freq
+from wavetable.playback import midi2freq
 from dataclasses import dataclass, field, InitVar
 from wavetable.wave_util import AttrDict, Rescaler
 
@@ -120,7 +120,7 @@ class WaveReader:
 
         self.wav = self.wav.astype(float)   # TODO divide by peak
         if cfg.pitch_estimate:
-            self.freq_estimate = pitch2freq(cfg.pitch_estimate)
+            self.freq_estimate = midi2freq(cfg.pitch_estimate)
         else:
             self.freq_estimate = None
 

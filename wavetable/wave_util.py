@@ -1,8 +1,12 @@
 import math
-from typing import NamedTuple
+from typing import NamedTuple, TypeVar
 
 import numpy as np
 from numpy.fft import ifft, fft
+
+
+def A(*args):
+    return np.array(args)
 
 
 class AttrDict(dict):
@@ -136,9 +140,20 @@ class Rescaler:
         return self.rescale_peak(ys)[0]
 
 
-def pitch2freq(pitch: int):
+# Pitch conversion
+
+def midi2freq(pitch: int):
     freq = 440 * 2 ** ((pitch - 69) / 12)
     return freq
+
+
+Numbers = TypeVar('Numbers', float, np.ndarray)
+
+
+def freq2midi(freq: Numbers) -> Numbers:
+    freq_ratio = freq / 440
+    semitones = 12 * (np.log(freq_ratio) / np.log(2))
+    return semitones + 69
 
 
 TICKS_PER_SEMITONE = 32

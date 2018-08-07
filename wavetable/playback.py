@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from wavetable.wave_util import pitch2freq
+from wavetable.wave_util import midi2freq
 
 CPU_NTSC = 1.79e6
 FPS = 60
@@ -44,7 +44,7 @@ class N163Player:
             time = note.length() * FRAME_TIME
 
         wavelen = len(note.waveseq[0])
-        freq = pitch2freq(note.pitch)
+        freq = midi2freq(note.pitch)
 
         def idx_phase(phase):
             return (phase * wavelen).astype(int) % wavelen
