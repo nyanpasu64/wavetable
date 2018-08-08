@@ -98,8 +98,10 @@ def parse_at(at: str):
                 pass
 
             out.append(slice(*chunks))
-        else:
+        elif word in [LOOP, RELEASE]:
             out.append(word)
+        else:
+            raise ValueError(f'Invalid sweep parameter {word}')
     return out
 
 
