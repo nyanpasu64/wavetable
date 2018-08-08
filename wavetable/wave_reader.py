@@ -202,7 +202,7 @@ class WaveReader:
         waves = wave_util.align_waves(waves)
         if self.cfg.vol_range:
             vols = self.vol_rescaler.rescale(vols)
-        return Instr(waves, AttrDict(freqs=freqs, vols=vols))
+        return Instr(waves, freqs=freqs, vols=vols)
 
     def _wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
         """ Pure function, no side effects.

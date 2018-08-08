@@ -1,7 +1,10 @@
 from numbers import Number
-from typing import List, Sequence, Union
+from typing import List, Sequence, Union, Optional, ClassVar
 
 import numpy as np
+from dataclasses import dataclass
+
+from wavetable.util.math import seq_along
 from wavetable.wave_util import AttrDict, freq2pitch
 
 HEX = ['0x', '$']
@@ -107,26 +110,29 @@ class MML(np.ndarray):
 
 
 # TODO replace freqs with pitches (MIDI), add "root_pitch: int"
-# rename waves to waves
-# rename wave_inds to sweep?
+
+SeqType = Union[MML, np.ndarray, list, None]    # Converted to Optional[MML]
+
+
+@dataclass
 class Instr:
     waves: List[np.ndarray]
 
-    SEQS = ['sweep', 'vols', 'freqs']
-    sweep: np.ndarray
-    vols: np.ndarray
-    freqs: np.ndarray
+    sweep: SeqType = None
+    vols: SeqType = None
+    freqs: SeqType = None
 
-    def __init__(self, waves: List[np.array], cfg: dict = None, **kwargs):
-        cfg = AttrDict(cfg, **kwargs)
-        self.waves = [np.asarray(wave) for wave in waves]
+    SEQS: ClassVar = ['sweep', 'vols', 'freqs']
 
-        self.sweep = cfg.get('wave_inds', None)
+    def __post_init__(self):
+        # Convert waves to ndarrays
+        self.waves = [np.asarray(wave) for wave in self.waves]
+
+        # Linear sweep through all waves
         if self.sweep is None:
-            self.sweep = np.arange(len(self.waves))
-        self.vols = cfg.get('vols', None)
-        self.freqs = cfg.get('freqs', None)
+            self.sweep = seq_along(self.waves)
 
+        # Convert sequences to MML
         for seq_key in self.SEQS:
             seq = getattr(self, seq_key)
             if seq is not None:
@@ -220,8 +226,7 @@ def _normalize(numeric_arg: Union[Number, Sequence, None]) -> Sequence[Number]:
 
 
 class MergeInstr(Instr):
-    def __init__(self, waves: List[np.array], harmonic: int = 1,
-                 vols: Union[Number, Sequence, MML] = None):
+    def __init__(self, waves: List[np.array], **kwargs: Union[Number, Sequence, MML]):
 
         # super().'wave_inds', 'vols', 'freqs'
         # We only use vols.
