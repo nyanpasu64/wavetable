@@ -1,14 +1,14 @@
 import io
+import numpy as np
 from contextlib import redirect_stdout
 from pathlib import Path
 
-import py.test
 import pytest
-from wavetable.instrument import Instr
 
+from wavetable.instrument import Instr
+from wavetable.util.math import ceildiv
 from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg
 
-assert py.test
 
 CFG_DIR = Path('tests')
 WAV_PATH = Path('test_waves/Sample 19.wav')
@@ -69,3 +69,40 @@ def test_subset(read):
     with io.StringIO() as dummy_stdout, \
             redirect_stdout(dummy_stdout):
         sub.print(74)
+
+
+def test_subsample():
+    wave_sub = 2
+    env_sub = 3
+
+    # should wave mandatory =N*env?
+    for nwave in [3, 4]:    # , 5]:
+        cfg = n163_cfg(
+            wav_path=WAV_PATH,
+            nsamp=NSAMP,
+            fps=60,
+            pitch_estimate=74,
+
+            nwave=nwave,
+            wave_sub=wave_sub,
+            env_sub=env_sub,
+        )
+        read = WaveReader(CFG_DIR, cfg)
+        instr = read.read()
+
+        # Subsampled waves
+        assert len(instr.waves) == ceildiv(nwave, wave_sub)
+
+        # Subsampled sweep
+        sweep = [i // wave_sub for i in range(nwave)]
+        assert (instr.sweep == sweep).all()
+
+        # Subsampled volume/pitch
+        def check(arr: np.ndarray):
+            assert (arr[begin:end] == arr[begin]).all()
+
+        for i in range(ceildiv(nwave, env_sub)):
+            begin = env_sub * i
+            end = env_sub * (i + 1)
+            check(instr.vols)
+            check(instr.freqs)

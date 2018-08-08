@@ -50,8 +50,8 @@ class WaveConfig:
 
     # Frame rate and subsampling
     fps: int = 60
-    # wave_sub: int = 1   # Each wave is repeated `wave_sub` times.
-    # env_sub: int = 1    # Each volume/frequency entry is repeated `env_sub` times.
+    wave_sub: int = 1   # Each wave is repeated `wave_sub` times.
+    env_sub: int = 1    # Each volume/frequency entry is repeated `env_sub` times.
     # subsampling: int = field(init=False)  TODO
 
     # Instrument subsampling via user-chosen indexes
@@ -165,18 +165,21 @@ class WaveReader:
             self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
 
     def read(self) -> Instr:
-        """ For each frame, extract wave_at. """
+        """ read_at() one wave per frame, then filter the results. """
 
-        start = self.cfg.start
+        nsamp_frame = np.rint(self.smp_time(self.frame_time)).astype(int)
 
-        frame_dsamp = np.rint(self.smp_time(self.frame_time)).astype(int)
-        start_samp = start * frame_dsamp
+        # Calculate start_samp, stop_samp
+        start_frame = self.cfg.start
+        start_samp = start_frame * nsamp_frame
+
         if self.cfg.nwave:
-            stop_samp = (start + self.cfg.nwave) * frame_dsamp
+            stop_samp = (start_frame + self.cfg.nwave) * nsamp_frame
         else:
             stop_samp = len(self.wav)
 
-        sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
+        # read_at() for every frame in the audio file.
+        sample_offsets = list(range(start_samp, stop_samp, nsamp_frame))
         instr = self.read_at(sample_offsets)
 
         # Pick a subset of the waves extracted.
@@ -185,7 +188,9 @@ class WaveReader:
         return instr
 
     def read_at(self, sample_offsets: Sequence) -> Instr:
-        wave_seq = []
+        """ Read and align waves at specified samples, returning an Instr.
+        read() calls read_at() for every frame in the audio file. """
+        waves = []
         freqs = []
         vols = []
         for offset in sample_offsets:
@@ -200,9 +205,9 @@ class WaveReader:
         return Instr(waves, AttrDict(freqs=freqs, vols=vols))
 
     def _wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
-        """
-        :param sample_offset: offset
-        :return: (wave, freq, volume)
+        """ Pure function, no side effects.
+        Computes STFT at sample, rounds wave to cfg.range.
+        Returns wave, frequency, and volume.
         """
 
         # Get STFT. Extract ~~power~~ from bins into new waveform's Fourier buffer.
