@@ -2,14 +2,14 @@ import re
 import subprocess
 from fractions import Fraction
 from pathlib import Path
-from typing import Sequence, Optional, Pattern, AnyStr, List
+from typing import Sequence, Optional, Pattern, AnyStr, List, Dict
 
 import click
 import numpy as np
+from dataclasses import dataclass, asdict
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 
-from dataclasses import dataclass, asdict
 from wavetable.wave_reader import WaveReader, WaveConfig
 from wavetable.wave_util import freq2midi
 
@@ -46,7 +46,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
         if not cfgs:
             raise click.ClickException(f'Wave directory {wav_dir} has no .cfg files')
 
-        metadata_list: List[dict] = []
+        metadata_list: Dict[dict] = {}
 
         # wave_fps: 30
         # pitch_fps: 90
@@ -54,8 +54,9 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
 
         # Process each .cfg file.
         for cfg_path in cfgs:
+            cfg_name = cfg_path.stem
             metadata = process_cfg(global_cfg, cfg_path)
-            metadata_list.append(asdict(metadata))
+            metadata_list[cfg_name] = asdict(metadata)
 
         # Wavetable metadata file
         yaml.dump(metadata_list, WAVETABLE_PATH)
@@ -71,8 +72,10 @@ class WavetableConfig(WaveConfig):
 
 @dataclass
 class WavetableMetadata:
-    wave_fps: int
-    pitch_fps: int
+    fps: int
+    wave_sub: int   # Each wave is repeated `wave_sub` times.
+    env_sub: int    # Each volume/frequency entry is repeated `env_sub` times.
+
     pitches: List[float]
 
 
@@ -129,7 +132,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
     wr = WaveReader(cfg_path.parent, cfg)
     instr = wr.read()
 
-    for i, wave in enumerate(instr.waveseq):
+    for i, wave in enumerate(instr.waves):
         wave_name = f'{cfg_name}-{i:03}'
 
         wav_path = (wav_dir / wave_name).with_suffix('.wav')
@@ -160,10 +163,12 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
     pitches: List[float] = freq2midi(instr.freqs).tolist()
 
     return WavetableMetadata(
-        wave_fps=cfg.wave_fps,
-        pitch_fps=cfg.pitch_fps,
-        pitches=pitches
+        fps=cfg.fps,
+        wave_sub=cfg.wave_sub,
+        env_sub=cfg.env_sub,
+        pitches=pitches,
     )
+
 
 @dataclass
 class BrrConfig:
@@ -175,7 +180,6 @@ class BrrConfig:
 
     gaussian: bool = True
     nowrap: bool = True
-
 
 
 class BrrEncoder:
