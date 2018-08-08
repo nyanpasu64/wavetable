@@ -63,7 +63,7 @@ class WaveConfig:
 
     # STFT configuration
     fft_mode: str = 'normal'
-    segment_ms: float = 1000/30  # Length of each STFT window
+    width_ms: float = 1000 / 60  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
 
     # Output bit depth and rounding
@@ -71,7 +71,7 @@ class WaveConfig:
     vol_range: Optional[int] = 16
 
     def __post_init__(self):
-        self.segment_ms = safe_eval(str(self.segment_ms))
+        self.width_ms = safe_eval(str(self.width_ms))
         self.sweep = parse_sweep(self.sweep)
         # self.subsampling = math.gcd(self.wave_sub, self.env_sub)  TODO
 
@@ -142,7 +142,7 @@ class WaveReader:
         # self.offset = cfg.get('offset', 0.5)
 
         # STFT parameters
-        segment_time = cfg.segment_ms / 1000
+        segment_time = cfg.width_ms / 1000
         self.segment_smp = self.smp_time(segment_time)
         self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
         self.segment_time = self.time_smp(self.segment_smp)
