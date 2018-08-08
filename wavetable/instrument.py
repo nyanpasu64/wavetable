@@ -1,11 +1,11 @@
 from numbers import Number
-from typing import List, Sequence, Union, Optional, ClassVar
+from typing import List, Sequence, Union, ClassVar, Dict
 
 import numpy as np
 from dataclasses import dataclass
 
 from wavetable.util.math import seq_along
-from wavetable.wave_util import AttrDict, freq2pitch
+from wavetable.wave_util import freq2pitch
 
 HEX = ['0x', '$']
 LOOP = '|'
@@ -15,8 +15,10 @@ RELEASE = '/'
 def I(s, *args, **kwargs):
     return np.array([int(x, *args, **kwargs) for x in s.split()])
 
+
 def F(s):
     return np.array([float(x) for x in s.split()])
+
 
 def S(a, sep=' '):
     if isinstance(a, MML):
@@ -111,12 +113,12 @@ class MML(np.ndarray):
 
 # TODO replace freqs with pitches (MIDI), add "root_pitch: int"
 
-SeqType = Union[MML, np.ndarray, list, None]    # Converted to Optional[MML]
+SeqType = Union[MML, np.ndarray, list, None]  # Converted to Optional[MML]
 
 
 @dataclass
 class Instr:
-    waves: List[np.ndarray]
+    waves: Union[List[np.ndarray], np.ndarray]  # Converted to 2D ndarray
 
     sweep: SeqType = None
     vols: SeqType = None
@@ -124,21 +126,37 @@ class Instr:
 
     SEQS: ClassVar = ['sweep', 'vols', 'freqs']
 
+    @property
+    def seqs(self) -> Dict[str, np.ndarray]:
+        return {seq: getattr(self, seq) for seq in self.SEQS}
+
+    # @seqs.setter
+    # def seqs(self, seqs: Dict[str, np.ndarray]) -> None:
+    #     if seqs.keys() != set(self.SEQS):
+    #         raise ValueError(f"Cannot set seqs {seqs.keys()}, should be {self.SEQS}")
+    #     for key, seq in seqs.items():
+    #         setattr(self, key, seq)
+
     def __post_init__(self):
         # Convert waves to ndarrays
-        self.waves = [np.asarray(wave) for wave in self.waves]
+        for wave in self.waves:
+            if len(wave) != len(self.waves[0]):
+                raise ValueError('Invalid Instr with unequal wave lengths')
+
+        self.waves = np.asarray(self.waves)
 
         # Linear sweep through all waves
         if self.sweep is None:
             self.sweep = seq_along(self.waves)
 
         # Convert sequences to MML
-        for seq_key in self.SEQS:
-            seq = getattr(self, seq_key)
+        for k, seq in self.seqs.items():
             if seq is not None:
-                setattr(self, seq_key, np.array(seq).view(MML))
+                setattr(self, k, np.array(seq).view(MML))
 
     def __getitem__(self, get):
+        """ Return the specified frames from the instrument.
+        Does not remove unused waves. """
         inds = []
         loop_pos = None
         release_pos = None
@@ -154,18 +172,22 @@ class Instr:
             else:
                 inds.extend(np.r_[elem])
 
-        end = max(inds) + 1
-
-        sub_instr = Instr(self.waves[:end])
-        for seq_key in self.SEQS:
-            seq = getattr(self, seq_key)
+        # Pick frames from the sweep/volume/pitch.
+        sub_instr = Instr(self.waves)
+        for k, seq in sub_instr.seqs.items():
             if seq is not None:
-                seq = seq[inds]  # .view(MML) # type: MML
+                seq = seq[inds]
                 seq.loop = loop_pos
                 seq.release = release_pos
-            setattr(sub_instr, seq_key, seq)
+            setattr(sub_instr, k, seq)
 
         return sub_instr
+
+    def remove_unused_waves(self) -> None:
+        """ Remove unused waves. Mutates self in-place. """
+        used_wave_idx, used2out = np.unique(self.sweep, return_inverse=True)
+        self.waves = self.waves[used_wave_idx]
+        self.sweep[:] = used2out
 
     def print(self, *args):
         self.print_waves()
@@ -192,10 +214,6 @@ class Instr:
         print('pitch')
         print(S(pitch))
         print()
-
-
-def deduplicate(instr: Instr):
-    return instr  # todo
 
 
 def _get(waves: Sequence, i: int):
@@ -225,14 +243,14 @@ def _normalize(numeric_arg: Union[Number, Sequence, None]) -> Sequence[Number]:
     return numeric_arg
 
 
+@dataclass
 class MergeInstr(Instr):
     def __init__(self, waves: List[np.array], **kwargs: Union[Number, Sequence, MML]):
-
         # super().'wave_inds', 'vols', 'freqs'
         # We only use vols.
 
-        super().__init__(waves, vols=_normalize(vols))
-        self.harmonic = harmonic
+        super().__init__(waves, vols=_normalize(kwargs[vols]))
+        self.harmonic = kwargs[harmonic]
 
     def get_wave_scaled(self, idx):
         wave = _get(self.waves, idx)
