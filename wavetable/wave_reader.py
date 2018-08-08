@@ -63,7 +63,7 @@ class WaveConfig:
 
     # STFT configuration
     fft_mode: str = 'normal'
-    segment_ms: float = 1000/60  # Length of each STFT window
+    segment_ms: float = 1000/30  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
 
     # Output bit depth and rounding
