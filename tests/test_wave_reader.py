@@ -127,13 +127,12 @@ def test_reader_wave_locs(cfg):
     assert (instr.sweep == map(int, '0 1 1 2 2 2 3'.split())).all()
 
 
-@pytest.mark.xfail(strict=True)
 def test_reader_subsample():
     wave_sub = 2
     env_sub = 3
 
     # should wave mandatory =N*env?
-    for nwave in [3, 4]:    # , 5]:
+    for nwave in [3, 4]:
         cfg = n163_cfg(
             wav_path=WAV_PATH,
             nsamp=NSAMP,
@@ -148,18 +147,18 @@ def test_reader_subsample():
         instr = read.read()
 
         # Subsampled waves
-        assert len(instr.waves) == ceildiv(nwave, wave_sub)
+        nwave_sub = ceildiv(nwave, wave_sub)
+        assert len(instr.waves) == nwave_sub
 
         # Subsampled sweep
-        sweep = [i // wave_sub for i in range(nwave)]
-        assert (instr.sweep == sweep).all()
+        assert (instr.sweep == np.arange(nwave_sub)).all()
 
         # Subsampled volume/pitch
+        nenv_sub = ceildiv(nwave, env_sub)
+
         def check(arr: np.ndarray):
-            assert (arr[begin:end] == arr[begin]).all()
+            assert len(arr) == nenv_sub
 
         for i in range(ceildiv(nwave, env_sub)):
-            begin = env_sub * i
-            end = env_sub * (i + 1)
             check(instr.vols)
             check(instr.freqs)

@@ -167,7 +167,9 @@ class WaveReader:
             self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
 
     def read(self) -> Instr:
-        """ read_at() one wave per frame, then filter the results. """
+        """ read_at() one wave per frame.
+        Filter the results using `sweep`, `wave_sub`, and `env_sub`.
+        Remove unused waves. """
 
         nsamp_frame = np.rint(self.smp_time(self.frame_time)).astype(int)
 
@@ -187,7 +189,14 @@ class WaveReader:
         # Pick a subset of the waves extracted.
         if self.cfg.sweep:
             instr = instr[self.cfg.sweep]
-            instr.remove_unused_waves()
+
+        # Apply subsampling.
+        instr.sweep = instr.sweep[::self.cfg.wave_sub]
+
+        instr.vols = instr.vols[::self.cfg.env_sub]
+        instr.freqs = instr.freqs[::self.cfg.env_sub]
+
+        instr.remove_unused_waves()
         return instr
 
     def read_at(self, sample_offsets: Sequence) -> Instr:
