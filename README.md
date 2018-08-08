@@ -23,14 +23,17 @@ nsamp: N163 wave length
 pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
                                 # This tool may estimate the wrong octave, if line is missing.
                                 # (fixme crashes) Exclude if WAV file has pitch changes 1 octave or greater.
-[optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
-[optional] wave_sub: 2      # Subsampling factor for waves (and wave indices)
-[optional] env_sub: 1       # Subsampling factor for volume and frequency
-at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
-                                # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
-                                # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
-[optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
-[optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+
+# All below are optional.
+
+fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
+wave_sub: 2      # Subsampling factor for waves (and wave indices)
+env_sub: 1       # Subsampling factor for volume and frequency
+
+(TODO) wave_locs: 0 1 3 6              # Rip four waves at frames 0,1,3,6, and generate wave envelope 0 1 1 2 2 2 3.
+sweep: "0:15 | 15:30 30:15"     # Generates synchronized wave and volume envelopes.
+nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
+fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
 ```
 
 - foo is subsampled, and each entry is repeated by a factor of `foo_sub`.
