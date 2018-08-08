@@ -2,7 +2,7 @@ from numbers import Number
 from typing import List, Sequence, Union, ClassVar, Dict
 
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, Field
 
 from wavetable.util.math import seq_along
 from wavetable.wave_util import freq2pitch
@@ -116,7 +116,7 @@ class MML(np.ndarray):
 SeqType = Union[MML, np.ndarray, list, None]  # Converted to Optional[MML]
 
 
-@dataclass
+@dataclass(eq=False)
 class Instr:
     waves: Union[List[np.ndarray], np.ndarray]  # Converted to 2D ndarray
 
@@ -129,13 +129,6 @@ class Instr:
     @property
     def seqs(self) -> Dict[str, np.ndarray]:
         return {seq: getattr(self, seq) for seq in self.SEQS}
-
-    # @seqs.setter
-    # def seqs(self, seqs: Dict[str, np.ndarray]) -> None:
-    #     if seqs.keys() != set(self.SEQS):
-    #         raise ValueError(f"Cannot set seqs {seqs.keys()}, should be {self.SEQS}")
-    #     for key, seq in seqs.items():
-    #         setattr(self, key, seq)
 
     def __post_init__(self):
         # Convert waves to ndarrays
@@ -153,6 +146,18 @@ class Instr:
         for k, seq in self.seqs.items():
             if seq is not None:
                 setattr(self, k, np.array(seq).view(MML))
+
+    def __eq__(self, other):
+        if not isinstance(other, Instr):
+            return NotImplemented
+
+        # Ensure that all ndarrays are equal.
+        field: Field
+        for field in fields(self):
+            name = field.name
+            if getattr(self, name).tolist() != getattr(other, name).tolist():
+                return False
+        return True
 
     def __getitem__(self, get):
         """ Return the specified frames from the instrument.
@@ -174,13 +179,14 @@ class Instr:
 
         # Pick frames from the sweep/volume/pitch.
         sub_instr = Instr(self.waves)
-        for k, seq in sub_instr.seqs.items():
+        for k, seq in self.seqs.items():
             if seq is not None:
                 seq = seq[inds]
                 seq.loop = loop_pos
                 seq.release = release_pos
             setattr(sub_instr, k, seq)
 
+        # TODO call sub_instr.remove_unused_waves()? it reduces testability
         return sub_instr
 
     def remove_unused_waves(self) -> None:
