@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Tuple, Sequence, Optional
 
 import numpy as np
+from dataclasses import dataclass, field, InitVar
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr
@@ -15,7 +16,7 @@ from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr
 from wavetable.playback import midi2freq
-from dataclasses import dataclass, field, InitVar
+from wavetable.util.parsing import safe_eval
 from wavetable.wave_util import AttrDict, Rescaler
 
 assert transfers    # module used by cfg.transfer
@@ -44,24 +45,35 @@ def main(cfg_path):
 @dataclass
 class WaveConfig:
     wav_path: str
-    pitch_estimate: int
+    pitch_estimate: int     # TODO documentation allows for excluding, but instr.print(note) fails?
     nsamp: int
-    nwave: Optional[int] = None
 
-    at: InitVar[str] = ''
+    # Frame rate and subsampling
+    fps: int = 60
+    # wave_sub: int = 1   # Each wave is repeated `wave_sub` times.
+    # env_sub: int = 1    # Each volume/frequency entry is repeated `env_sub` times.
+    # subsampling: int = field(init=False)  TODO
+
+    # Instrument subsampling via user-chosen indexes
+    nwave: Optional[int] = None
+    start: int = 0          # Deprecated
+
+    at: InitVar[str] = ''   # Deprecated
     wave_indices: list = field(init=False)
 
-    range: Optional[int] = 16
-    vol_range: Optional[int] = 16
-    fps: int = 60
-
+    # STFT configuration
     fft_mode: str = 'normal'
-    start: int = 0
-    width_frames: int = 1
+    segment_ms: float = 1000/60  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
 
+    # Output bit depth and rounding
+    range: Optional[int] = 16
+    vol_range: Optional[int] = 16
+
     def __post_init__(self, at):
+        self.segment_ms = safe_eval(str(self.segment_ms))
         self.wave_indices = parse_at(at or '')
+        # self.subsampling = math.gcd(self.wave_sub, self.env_sub)  TODO
 
 
 def parse_at(at: str):
@@ -128,10 +140,10 @@ class WaveReader:
         # self.offset = cfg.get('offset', 0.5)
 
         # STFT parameters
-        segment_time = self.frame_time * cfg.width_frames
-        self.segment_smp = self.s_t(segment_time)
+        segment_time = cfg.segment_ms / 1000
+        self.segment_smp = self.smp_time(segment_time)
         self.segment_smp = 2 ** math.ceil(np.log2(self.segment_smp))  # type: int
-        self.segment_time = self.t_s(self.segment_smp)
+        self.segment_time = self.time_smp(self.segment_smp)
 
         self.window = np.hanning(self.segment_smp)
         self.power_sum = wave_util.power_merge
@@ -157,7 +169,7 @@ class WaveReader:
 
         start = self.cfg.start
 
-        frame_dsamp = np.rint(self.s_t(self.frame_time)).astype(int)
+        frame_dsamp = np.rint(self.smp_time(self.frame_time)).astype(int)
         start_samp = start * frame_dsamp
         if self.cfg.nwave:
             stop_samp = (start + self.cfg.nwave) * frame_dsamp
@@ -167,7 +179,7 @@ class WaveReader:
         sample_offsets = list(range(start_samp, stop_samp, frame_dsamp))
         instr = self.read_at(sample_offsets)
 
-        # Pick a subset of the waves extracted. (TODO don't subsample pitch/volume)
+        # Pick a subset of the waves extracted.
         if self.cfg.wave_indices:
             instr = instr[self.cfg.wave_indices]
         return instr
@@ -245,16 +257,16 @@ class WaveReader:
         data = self.wav[sample_offset:sample_offset + self.segment_smp]  # type: np.ndarray
         return data.copy()
 
-    def s_t(self, time):
+    def smp_time(self, time):
         return int(time * self.sr)
 
-    def t_f(self, frame):
+    def time_frame(self, frame):
         return frame * self.frame_time
 
-    def f_t(self, time):
+    def frame_time(self, time):
         return int(time / self.frame_time)
 
-    def t_s(self, sample):
+    def time_smp(self, sample):
         return sample / self.sr
 
 
