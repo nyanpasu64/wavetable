@@ -102,11 +102,7 @@ class MML(np.ndarray):
             new.release = munge(new.release)
         return new
 
-    def __truediv__(self, other):
-        return self // other
-
     def __round__(self):
-        # out = np.round(self)
         out = np.ceil(self - 0.5)
         return out.astype(int)
 
