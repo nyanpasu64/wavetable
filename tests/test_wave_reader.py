@@ -40,8 +40,8 @@ def test_wave_reader(read):
     instr = read.read()
     assert isinstance(instr, Instr)
 
-    waveseq = instr.waveseq
-    assert len(waveseq) == NWAVE
+    waves = instr.waves
+    assert len(waves) == NWAVE
 
 
 def test_read_at(read):
@@ -50,8 +50,8 @@ def test_read_at(read):
     instr = read.read_at(inds)
     assert isinstance(instr, Instr)
 
-    waveseq = instr.waveseq
-    assert len(waveseq) == len(inds)
+    waves = instr.waves
+    assert len(waves) == len(inds)
 
 
 def test_reader_instr(read):

@@ -76,13 +76,13 @@ def load_file_mml(filename, mml=None, vol_curve=None):
     return merge_waves_mml(waves, mml, vol_curve)
 
 
-def print_waves(waveseq):
-    strs = [S(wave) for wave in waveseq]
+def print_waves(waves):
+    strs = [S(wave) for wave in waves]
     print(';\n'.join(strs))
     print()
 
 
-print_waveseq = print_waves
+print_waves = print_waves
 
 # class MergeStyle(Enum):
 #     POWER = 1
@@ -133,8 +133,8 @@ class Merge:
 
     def merge_instrs(self, instrs: List[MergeInstr], nsamp, transfer=transfers.Unity()):
         """ Pads each MergeInstr to longest. Then merges all and returns new $waves. """
-        length = max(len(instr.waveseq) for instr in instrs)
-        merged_waveseq = []
+        length = max(len(instr.waves) for instr in instrs)
+        merged_waves = []
 
         for wave_idx in range(length):
             harmonic_waves = []
@@ -145,30 +145,30 @@ class Merge:
                 harmonic_waves.append(harmonic_wave)
 
             out = self._merge_waves(harmonic_waves, nsamp=nsamp, transfer=transfer)
-            merged_waveseq.append(out)
+            merged_waves.append(out)
 
         if self.scaling == 'global':
-            return self.rescaler.rescale(merged_waveseq)
+            return self.rescaler.rescale(merged_waves)
         else:
-            return merged_waveseq
+            return merged_waves
 
     @staticmethod
-    def combine(waveseq):
-        """ Returns minimal waveseq, MML string. """
-        waveseq = [tuple(wave) for wave in waveseq]
+    def combine(waves):
+        """ Returns minimal waves, MML string. """
+        waves = [tuple(wave) for wave in waves]
         wave2idx = OrderedDict()
         curr_idx = 0
 
         mml = []
 
-        for wave in waveseq:
+        for wave in waves:
             if wave not in wave2idx:
                 wave2idx[wave] = curr_idx
                 curr_idx += 1
             mml.append(wave2idx[wave])
 
-        minimal_waveseq = list(wave2idx.keys())
-        print_waveseq(minimal_waveseq)
+        minimal_waves = list(wave2idx.keys())
+        print_waves(minimal_waves)
         print(S(mml))
         print()
         print()

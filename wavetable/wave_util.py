@@ -70,10 +70,10 @@ def correlate_offset(fixed, sweep) -> Correlation:
     return Correlation(offset, should_invert)
 
 
-def align_waves(waveseq):
-    """ Returns maximum-correlation copy of waveseq. """
-    out = [waveseq[0]]
-    for i, wave in enumerate(waveseq[1:], 1):
+def align_waves(waves):
+    """ Returns maximum-correlation copy of waves. """
+    out = [waves[0]]
+    for i, wave in enumerate(waves[1:], 1):
         state = correlate_offset(out[-1], wave)
 
         correlated = np.roll(wave, state.offset)

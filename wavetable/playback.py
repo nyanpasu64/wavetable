@@ -9,13 +9,13 @@ CPU_NTSC = 1.79e6
 FPS = 60
 FRAME_TIME = 1.0/FPS
 
-_note = namedtuple('note', 'waveseq vol pitch')
+_note = namedtuple('note', 'waves vol pitch')
 class Note(_note):
     def length(self):
-        return len(self.waveseq)
+        return len(self.waves)
 
     def get(self, i):
-        return self.waveseq[i % self.length()]
+        return self.waves[i % self.length()]
 
 
 class N163Player:
@@ -43,7 +43,7 @@ class N163Player:
         if time is None:
             time = note.length() * FRAME_TIME
 
-        wavelen = len(note.waveseq[0])
+        wavelen = len(note.waves[0])
         freq = midi2freq(note.pitch)
 
         def idx_phase(phase):

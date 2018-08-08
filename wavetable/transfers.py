@@ -117,22 +117,22 @@ def filter_wave(wave: WaveType, transfer) -> WaveType:
     return fourier.irfft_norm(harm)
 
 
-def filter_waveseq(seq: List[WaveType], transfer) -> List[WaveType]:
-    new_waveseq = []
+def filter_waves(seq: List[WaveType], transfer) -> List[WaveType]:
+    new_waves = []
     for wave in seq:
         new_wave = filter_wave(wave, transfer)
-        new_waveseq.append(new_wave)
+        new_waves.append(new_wave)
 
-    return new_waveseq
+    return new_waves
 
 
 def filter_instr(instr: 'Instr', transfer):
-    """ Filters instr.waveseq with "transfer", in-place. """
+    """ Filters instr.waves with "transfer", in-place. """
     # """ Returns shallow copy of instr, with altered waves. """
 
-    new_waveseq = filter_waveseq(instr.waveseq, transfer)
-    instr.waveseq = new_waveseq
+    new_waves = filter_waves(instr.waves, transfer)
+    instr.waves = new_waves
 
     # new_instr = copy(instr)
-    # new_instr.waveseq = new_waveseq
+    # new_instr.waves = new_waves
     # return new_instr

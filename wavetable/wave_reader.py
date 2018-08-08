@@ -190,14 +190,14 @@ class WaveReader:
         vols = []
         for offset in sample_offsets:
             wave, freq, peak = self._wave_at(offset)
-            wave_seq.append(wave)
+            waves.append(wave)
             freqs.append(freq)
             vols.append(peak)
 
-        wave_seq = wave_util.align_waves(wave_seq)
+        waves = wave_util.align_waves(waves)
         if self.cfg.vol_range:
             vols = self.vol_rescaler.rescale(vols)
-        return Instr(wave_seq, AttrDict(freqs=freqs, vols=vols))
+        return Instr(waves, AttrDict(freqs=freqs, vols=vols))
 
     def _wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
         """
