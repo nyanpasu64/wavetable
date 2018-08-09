@@ -49,7 +49,7 @@ class WaveReaderConfig:
     nsamp: int
 
     # Frame rate and subsampling
-    fps: int = 60
+    fps: float = 60
     wave_sub: int = 1   # Each wave is repeated `wave_sub` times.
     env_sub: int = 1    # Each volume/frequency entry is repeated `env_sub` times.
     # subsampling: int = field(init=False)  TODO
@@ -116,6 +116,8 @@ def n163_cfg(**kwargs):
 
 
 class WaveReader:
+    ntick: Optional[int]
+
     def __init__(self, cfg_dir: Path, cfg: WaveReaderConfig):
         self.cfg = cfg
 
@@ -139,7 +141,7 @@ class WaveReader:
             self.freq_estimate = None
 
         self.frame_time = 1 / cfg.fps
-        # self.offset = cfg.get('offset', 0.5)
+        self.ntick = None
 
         # STFT parameters
         segment_time = cfg.width_ms / 1000
@@ -184,6 +186,7 @@ class WaveReader:
 
         # read_at() for every frame in the audio file.
         sample_offsets = list(range(start_samp, stop_samp, nsamp_frame))
+        self.ntick = len(sample_offsets)
         instr = self.read_at(sample_offsets)
 
         # Pick a subset of the waves extracted.

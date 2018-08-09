@@ -46,7 +46,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
         if not cfgs:
             raise click.ClickException(f'Wave directory {wav_dir} has no .cfg files')
 
-        metadata_list: Dict[dict] = {}
+        metadata_list: Dict[str, dict] = {}
 
         # wave_fps: 30
         # pitch_fps: 90
@@ -72,7 +72,9 @@ class WavetableConfig(WaveReaderConfig):
 
 @dataclass
 class WavetableMetadata:
-    fps: int
+    nsamp: int
+    ntick: int
+    fps: float
     wave_sub: int   # Each wave is repeated `wave_sub` times.
     env_sub: int    # Each volume/frequency entry is repeated `env_sub` times.
 
@@ -131,6 +133,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
     # Generate wavetables
     wr = WaveReader(cfg_path.parent, cfg)
     instr = wr.read()
+    ntick = wr.ntick
 
     for i, wave in enumerate(instr.waves):
         wave_name = f'{cfg_name}-{i:03}'
@@ -163,6 +166,8 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
     pitches: List[float] = freq2midi(instr.freqs).tolist()
 
     return WavetableMetadata(
+        nsamp=cfg.nsamp,
+        ntick=ntick,
         fps=cfg.fps,
         wave_sub=cfg.wave_sub,
         env_sub=cfg.env_sub,

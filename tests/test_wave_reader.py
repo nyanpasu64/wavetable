@@ -132,14 +132,14 @@ def test_reader_subsample():
     env_sub = 3
 
     # should wave mandatory =N*env?
-    for nwave in [3, 4]:
+    for ntick in [3, 4]:
         cfg = n163_cfg(
             wav_path=WAV_PATH,
             nsamp=NSAMP,
             fps=60,
             pitch_estimate=74,
 
-            nwave=nwave,
+            nwave=ntick,
             wave_sub=wave_sub,
             env_sub=env_sub,
         )
@@ -147,18 +147,18 @@ def test_reader_subsample():
         instr = read.read()
 
         # Subsampled waves
-        nwave_sub = ceildiv(nwave, wave_sub)
+        nwave_sub = ceildiv(ntick, wave_sub)
         assert len(instr.waves) == nwave_sub
 
         # Subsampled sweep
         assert (instr.sweep == np.arange(nwave_sub)).all()
 
         # Subsampled volume/pitch
-        nenv_sub = ceildiv(nwave, env_sub)
+        nenv_sub = ceildiv(ntick, env_sub)
 
         def check(arr: np.ndarray):
             assert len(arr) == nenv_sub
 
-        for i in range(ceildiv(nwave, env_sub)):
+        for i in range(ceildiv(ntick, env_sub)):
             check(instr.vols)
             check(instr.freqs)
