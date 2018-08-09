@@ -31,7 +31,7 @@ def main(cfg_path):
     yaml = YAML(typ='safe')
     file_cfg = yaml.load(cfg_path)
 
-    cfg = WaveConfig(**file_cfg)
+    cfg = WaveReaderConfig(**file_cfg)
 
     with open(str(cfg_path) + '.txt', 'w') as f:
         with redirect_stdout(f):
@@ -43,7 +43,7 @@ def main(cfg_path):
 
 
 @dataclass
-class WaveConfig:
+class WaveReaderConfig:
     wav_path: str
     pitch_estimate: int     # TODO documentation allows for excluding, but instr.print(note) fails?
     nsamp: int
@@ -108,15 +108,15 @@ def parse_sweep(at: str) -> list:
 def unrounded_cfg(**kwargs):
     kwargs.setdefault('range', None)
     kwargs.setdefault('vol_range', None)
-    return WaveConfig(**kwargs)
+    return WaveReaderConfig(**kwargs)
 
 
 def n163_cfg(**kwargs):
-    return WaveConfig(**kwargs)
+    return WaveReaderConfig(**kwargs)
 
 
 class WaveReader:
-    def __init__(self, cfg_dir: Path, cfg: WaveConfig):
+    def __init__(self, cfg_dir: Path, cfg: WaveReaderConfig):
         self.cfg = cfg
 
         assert cfg_dir.is_dir()

@@ -10,7 +10,7 @@ from dataclasses import dataclass, asdict
 from ruamel.yaml import YAML
 from scipy.io import wavfile
 
-from wavetable.wave_reader import WaveReader, WaveConfig
+from wavetable.wave_reader import WaveReader, WaveReaderConfig
 from wavetable.wave_util import freq2midi
 
 
@@ -63,7 +63,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
 
 
 @dataclass
-class WavetableConfig(WaveConfig):
+class WavetableConfig(WaveReaderConfig):
     no_brr: bool = False
     unlooped_prefix: int = 0        # Controls the loop point of the wave.
     truncate_prefix: bool = True    # Remove unlooped prefix from non-initial samples
@@ -123,7 +123,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
     truncate_prefix = cfg.truncate_prefix
     gaussian = cfg.gaussian
 
-    brr_cfg = BrrConfig(
+    brr_cfg = BrrEncoderConfig(
         gaussian=gaussian,
         loop=unlooped_prefix,
     )
@@ -171,7 +171,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
 
 
 @dataclass
-class BrrConfig:
+class BrrEncoderConfig:
     loop: Optional[int] = None
     truncate: Optional[int] = None
 
@@ -193,7 +193,7 @@ class BrrEncoder:
     # Do not remove the trailing ellipses. That will hide bugs where the resampling
     # ratio is not extracted correctly (eg. truncated at the decimal point).
 
-    def __init__(self, cfg: BrrConfig, wav_path: Path, brr_path: Path):
+    def __init__(self, cfg: BrrEncoderConfig, wav_path: Path, brr_path: Path):
         self.cfg = cfg
         self.wav_path = wav_path
         self.brr_path = brr_path

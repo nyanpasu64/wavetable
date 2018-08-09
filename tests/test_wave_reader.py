@@ -9,7 +9,7 @@ import pytest
 
 from wavetable.instrument import Instr
 from wavetable.util.math import ceildiv
-from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg, WaveConfig
+from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg, WaveReaderConfig
 
 
 CFG_DIR = Path('tests')
@@ -19,7 +19,7 @@ NWAVE = 30
 
 
 @pytest.fixture(scope="module", params=[n163_cfg, unrounded_cfg])
-def cfg(request) -> WaveConfig:
+def cfg(request) -> WaveReaderConfig:
     """ request.param is a cfg factory, taken from params.
     "request" is a hardcoded name. """
     cfg = request.param(
