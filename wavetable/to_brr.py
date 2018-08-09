@@ -185,6 +185,10 @@ class BrrEncoderConfig:
 
     gaussian: bool = True
     nowrap: bool = True
+    filters: str = '01'
+    # Predictors '01' have exponentially decaying error after swapping samples.
+    # Higher-order predictors will cause the BRR hardware to extrapolate from
+    # the wrong slope, leading to massive errors and/or overflow.
 
 
 class BrrEncoder:
@@ -272,6 +276,10 @@ class BrrEncoder:
         # Attenuate volume
         if cfg.volume != 1.0:
             args += [f'-a{cfg.volume}']
+
+        # Filters
+        if cfg.filters:
+            args += [f'-f{cfg.filters}']
 
         # paths
         args += [str(self.wav_path), str(self.brr_path)]
