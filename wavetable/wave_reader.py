@@ -64,7 +64,7 @@ class WaveReaderConfig:
 
     # STFT configuration
     fft_mode: str = 'normal'
-    width_ms: float = 1000 / 60  # Length of each STFT window
+    width_ms: float = '1000 / 30'  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
 
     # Output bit depth and rounding
