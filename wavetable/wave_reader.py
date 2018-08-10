@@ -16,6 +16,7 @@ from wavetable import gauss
 from wavetable import wave_util
 from wavetable.instrument import Instr, LOOP, RELEASE
 from wavetable.playback import midi2freq
+from wavetable.util.math import nearest_sub_harmonic
 from wavetable.util.parsing import safe_eval
 from wavetable.wave_util import Rescaler
 
@@ -234,8 +235,7 @@ class WaveReader:
             # cyc/s * time/window = cyc/window
             approx_bin = self.freq_estimate * self.segment_time
             fft_peak = freq_from_autocorr(data, len(data))
-            harmonic = round(fft_peak / approx_bin)
-            freq_bin = fft_peak / harmonic
+            freq_bin = nearest_sub_harmonic(fft_peak, approx_bin)
 
         else:
             freq_bin = freq_from_autocorr(data, len(data))
