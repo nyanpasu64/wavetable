@@ -1,6 +1,6 @@
 import itertools
 from collections import OrderedDict
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from wavetable import wave_util
@@ -84,11 +84,6 @@ def print_waves(waves):
 
 print_waves = print_waves
 
-# class MergeStyle(Enum):
-#     POWER = 1
-#     AMPLITUDE = 2
-#     SUM = 3
-
 
 _MAXRANGE = 16
 
@@ -100,11 +95,16 @@ class Merge:
         'SUM': wave_util.sum_merge
     }
 
-    def __init__(self, maxrange: int, merge_style='POWER', fft='zoh', scaling='local'):
+    def __init__(self, maxrange: Optional[int], merge_style='POWER', fft='zoh', scaling='local'):
 
         self.phasor_merger = self.merge_funcs[merge_style]
         self.scaling = scaling
-        self.rescaler = Rescaler(maxrange)
+
+        if maxrange:
+            self.rescaler = Rescaler(maxrange)
+        else:
+            self.rescaler = None
+
         if fft == 'zoh':
             self.rfft = fourier.rfft_zoh
             self.irfft = fourier.irfft_zoh
@@ -126,7 +126,7 @@ class Merge:
             outs.append(self.phasor_merger(phasors) * transfer(f))
 
         wave_out = self.irfft(outs, nsamp)
-        if self.scaling == 'local':
+        if self.scaling == 'local' and self.rescaler:
             return self.rescaler.rescale(wave_out)
         else:
             return wave_out
@@ -147,7 +147,7 @@ class Merge:
             out = self._merge_waves(harmonic_waves, nsamp=nsamp, transfer=transfer)
             merged_waves.append(out)
 
-        if self.scaling == 'global':
+        if self.scaling == 'global' and self.rescaler:
             return self.rescaler.rescale(merged_waves)
         else:
             return merged_waves
