@@ -27,7 +27,7 @@ WAVETABLE_PATH = Path('wavetable.yaml')
 
 
 @click.command()
-@click.argument('WAV_DIRS', type=Folder, nargs=-1)
+@click.argument('WAV_DIRS', type=Folder, nargs=-1, required=True)
 @click.argument('DEST_DIR', type=Folder)
 def main(wav_dirs: Sequence[str], dest_dir: str):
     """Converts .wav files into a series of SNES-BRR wavetables compatible with AMK.
@@ -36,9 +36,9 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
     DEST_DIR: Location where .brr files are written."""
 
     global_cfg = ExtractorConfig(dest_dir=Path(dest_dir))
-
     for wav_dir in wav_dirs:
         wav_dir = Path(wav_dir)
+        print(wav_dir)
 
         cfgs = sorted(cfg_path for cfg_path in wav_dir.iterdir()
                       if cfg_path.suffix == CFG_EXT and cfg_path.is_file())
@@ -54,6 +54,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
 
         # Process each .cfg file.
         for cfg_path in cfgs:
+            print(cfg_path)
             cfg_name = cfg_path.stem
             metadata = process_cfg(global_cfg, cfg_path)
             metadata_list[cfg_name] = asdict(metadata)
