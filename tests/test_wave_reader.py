@@ -1,10 +1,9 @@
 import io
-
-import dataclasses
-import numpy as np
 from contextlib import redirect_stdout
 from pathlib import Path
 
+import dataclasses
+import numpy as np
 import pytest
 
 from wavetable.types.instrument import Instr
@@ -33,18 +32,82 @@ def cfg(request) -> WaveReaderConfig:
 
 
 @pytest.fixture(scope="module", params=[n163_cfg, unrounded_cfg])
-def read(request) -> WaveReader:
-    """ request.param is a cfg factory, taken from params.
-    "request" is a hardcoded name. """
-    cfg = request.param(
-        wav_path=WAV_PATH,
-        nsamp=NSAMP,
-        nwave=NWAVE,
-        fps=60,
-        pitch_estimate=74
-    )
-    yield WaveReader(CFG_DIR, cfg)
+def read(cfg) -> WaveReader:
+    return WaveReader(CFG_DIR, cfg)
 
+
+if True:
+    if False:
+        STEREO_PATHS = [Path('test_waves', path) for path in [
+            'stereo out of phase.wav',
+            'stereo right.wav'
+        ]]
+
+        @pytest.mark.parametrize("path", STEREO_PATHS)
+        @pytest.mark.parametrize("cfg_factory", [n163_cfg, unrounded_cfg])
+        @pytest.fixture(scope="module")
+        def stereo_cfg(path, cfg_factory):
+            return cfg_factory(
+                wav_path=path,
+                nsamp=NSAMP,
+                nwave=NWAVE,
+                fps=60,
+                pitch_estimate=74
+            )
+    else:
+        @pytest.fixture(scope="module", params=[
+            'stereo out of phase.wav',
+            'stereo right.wav'
+        ])
+        def stereo_path(request):
+            path = request.param
+            return Path('test_waves', path)
+
+
+        @pytest.fixture(scope="module", params=[n163_cfg, unrounded_cfg])
+        def cfg_factory(request):
+            return request.param
+
+
+        @pytest.fixture(scope="module")
+        def stereo_cfg(stereo_path, cfg_factory) -> WaveReaderConfig:
+            return cfg_factory(
+                wav_path=stereo_path,
+                nsamp=NSAMP,
+                nwave=NWAVE,
+                fps=60,
+                pitch_estimate=74
+            )
+
+    @pytest.fixture(scope="module")
+    def stereo_read(stereo_cfg) -> WaveReader:
+        return WaveReader(CFG_DIR, stereo_cfg)
+
+else:
+    STEREO_PATHS = [Path('test_waves', path) for path in [
+        'stereo out of phase.wav',
+        'stereo right.wav'
+    ]]
+
+    def stereo_cfg():
+        for path in STEREO_PATHS:
+            for cfg_factory in [n163_cfg, unrounded_cfg]:
+                yield cfg_factory(
+                    wav_path=path,
+                    nsamp=NSAMP,
+                    nwave=NWAVE,
+                    fps=60,
+                    pitch_estimate=74
+                )
+
+
+    # @pytest.fixture(scope="module")
+    def stereo_read() -> Iterable[WaveReader]:
+        for cfg in stereo_cfg():
+            yield WaveReader(CFG_DIR, cfg)
+
+
+# Basic tests
 
 def test_wave_at(read):
     """ Ensures wave is not constant. """
@@ -60,6 +123,8 @@ def test_wave_reader(read):
     assert len(waves) == NWAVE
 
 
+# STFT reader tests
+
 def test_read_at(read):
     inds = [0, 1, 3, 6, 10]
 
@@ -68,6 +133,9 @@ def test_read_at(read):
 
     waves = instr.waves
     assert len(waves) == len(inds)
+
+    for i, wave in enumerate(waves):
+        assert not (wave == wave[0]).all(), i
 
 
 def test_reader_instr(read):
@@ -78,6 +146,8 @@ def test_reader_instr(read):
             redirect_stdout(dummy_stdout):
         instr.print(2, True)
 
+
+# Indexing/sweep tests
 
 def test_instr_subset(read):
     instr = read.read()
@@ -162,3 +232,13 @@ def test_reader_subsample():
         for i in range(ceildiv(ntick, env_sub)):
             check(instr.vols)
             check(instr.freqs)
+
+
+# Stereo tests
+
+def test_reader_stereo(stereo_read):
+    instr = stereo_read.read()
+    waves = instr.waves
+
+    for i, wave in enumerate(waves):
+        assert not (wave == wave[0]).all(), i
