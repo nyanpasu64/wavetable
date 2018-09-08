@@ -2,8 +2,8 @@ from typing import List
 
 import numpy as np
 
-from wavetable import fourier
-from wavetable.instrument import Instr
+from wavetable.dsp import fourier
+from wavetable.types.instrument import Instr
 from wavetable.util.reprmixin import ReprMixin
 
 

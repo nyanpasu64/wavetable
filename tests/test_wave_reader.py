@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from wavetable.instrument import Instr
+from wavetable.types.instrument import Instr
 from wavetable.util.math import ceildiv
 from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg, WaveReaderConfig
 

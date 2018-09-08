@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from wavetable.wave import load_wave
+from wavetable.inputs.wave import load_wave
 
 
 ROOT = Path('tests/test_waves')

@@ -1,8 +1,6 @@
 # noinspection PyUnresolvedReferences
-import py.test
-import pytest
-from wavetable.fourier import *
-from wavetable.fourier import rfft_norm, irfft_norm, _zero_pad
+import numpy as np
+from wavetable.dsp.fourier import _zero_pad, rfft_norm, irfft_norm, rfft_zoh, irfft_zoh
 
 
 def assert_close(a, b):

@@ -9,6 +9,7 @@ def A(*args):
     return np.array(args)
 
 
+# TODO remove
 class AttrDict(dict):
     def __init__(self, seq=None, **kwargs):
         if seq is None:

@@ -1,11 +1,5 @@
-# import sys
-# import math
-# from pipetools import pipe
-
-
-# from global_util import *
 import numpy as np
-from wavetable.instrument import S
+from wavetable.types.instrument import S
 
 
 def cat(*args, **kwargs):

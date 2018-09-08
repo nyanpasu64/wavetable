@@ -5,7 +5,7 @@ import numpy as np
 from dataclasses import dataclass, fields, Field
 
 from wavetable.util.math import seq_along
-from wavetable.wave_util import freq2pitch
+from wavetable.dsp.wave_util import freq2pitch
 
 HEX = ['0x', '$']
 LOOP = '|'

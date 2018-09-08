@@ -3,12 +3,10 @@ from collections import OrderedDict
 from typing import List, Optional
 
 import numpy as np
-from wavetable import wave_util
-from wavetable.instrument import _get, I, F, S
-from wavetable import fourier
-from wavetable import transfers
-from wavetable.instrument import MergeInstr
-from wavetable.wave_util import Rescaler
+
+from wavetable.dsp import fourier, wave_util, transfers
+from wavetable.dsp.wave_util import Rescaler
+from wavetable.types.instrument import MergeInstr, _get, I, F, S
 
 
 # todo, MML belongs in Instrument

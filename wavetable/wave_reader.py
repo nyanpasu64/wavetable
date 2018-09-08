@@ -8,19 +8,16 @@ from typing import Tuple, Sequence, Optional, Union
 import numpy as np
 from dataclasses import dataclass
 from ruamel.yaml import YAML
-from scipy.io import wavfile
+from scipy.io import wavfile    # TODO remove
 from waveform_analysis.freq_estimation import freq_from_autocorr
 
-from wavetable import fourier, transfers
-from wavetable import gauss
-from wavetable import wave_util
-from wavetable.instrument import Instr, LOOP, RELEASE
-from wavetable.playback import midi2freq
+from wavetable.dsp import fourier, gauss, wave_util, transfers
+from wavetable.dsp.wave_util import Rescaler, midi2freq
+from wavetable.types.instrument import Instr, LOOP, RELEASE
 from wavetable.util.math import nearest_sub_harmonic
 from wavetable.util.parsing import safe_eval
-from wavetable.wave_util import Rescaler
 
-assert transfers    # module used by cfg.transfer
+assert transfers  # module used by cfg.transfer
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 # np.loge = np.ln = np.log
 

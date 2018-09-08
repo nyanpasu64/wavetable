@@ -11,7 +11,7 @@ from ruamel.yaml import YAML
 from scipy.io import wavfile
 
 from wavetable.wave_reader import WaveReader, WaveReaderConfig
-from wavetable.wave_util import freq2midi
+from wavetable.dsp.wave_util import freq2midi
 
 
 @dataclass

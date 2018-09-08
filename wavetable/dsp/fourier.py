@@ -1,7 +1,7 @@
 from typing import List, Union
 
 import numpy as np
-from wavetable.gauss import nyquist_exclusive, nyquist_inclusive
+from wavetable.dsp.gauss import nyquist_exclusive, nyquist_inclusive
 
 
 # I don't know why, but "inclusive" makes my test cases work.

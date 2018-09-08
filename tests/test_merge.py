@@ -1,7 +1,7 @@
 import sys
 from wavetable.merge import *
 import numpy as np
-from wavetable.wave_util import correlate_offset
+from wavetable.dsp.wave_util import correlate_offset
 
 
 def test_merge_waves_mml():

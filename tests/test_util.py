@@ -1,6 +1,6 @@
 import numpy as np
 
-from wavetable.wave_util import A, freq2midi
+from wavetable.dsp.wave_util import A, freq2midi
 
 
 def test_freq2midi():
