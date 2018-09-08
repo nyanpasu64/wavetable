@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 
 from wavetable.dsp import fourier
+from wavetable.dsp.fourier import InputSpectrum, WaveType, SpectrumType
 from wavetable.types.instrument import Instr
 from wavetable.util.reprmixin import ReprMixin
 
@@ -107,8 +108,11 @@ class LowPass1(TransferFunctor):
 
 # **** Utility functions ****
 
-WaveType = 'np.ndarray'
-SpectrumType = 'np.ndarray'
+
+def filter_fft(fft: InputSpectrum, transfer) -> SpectrumType:
+    fft = np.copy(fft)
+    fft[1:] *= transfer(np.arange(1, len(fft)))
+    return fft
 
 
 def filter_wave(wave: WaveType, transfer) -> WaveType:

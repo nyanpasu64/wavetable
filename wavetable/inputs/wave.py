@@ -23,6 +23,7 @@ class StereoMode(IntEnum):
         return value
 
 
+# FIXME rename to read_wave
 def load_wave(wav_path: str, stereo=StereoMode.ALL) -> Tuple[int, np.ndarray]:
     """Loads wave from file. Optionally merges data. Returns sr, data[index][chan]. """
 

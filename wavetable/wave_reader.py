@@ -1,6 +1,5 @@
 import math
 import sys
-import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Tuple, Sequence, Optional, Union
@@ -8,11 +7,12 @@ from typing import Tuple, Sequence, Optional, Union
 import numpy as np
 from dataclasses import dataclass
 from ruamel.yaml import YAML
-from scipy.io import wavfile    # TODO remove
 from waveform_analysis.freq_estimation import freq_from_autocorr
 
 from wavetable.dsp import fourier, gauss, wave_util, transfers
 from wavetable.dsp.wave_util import Rescaler, midi2freq
+from wavetable.inputs.wave import load_wave
+from wavetable.merge import Merge
 from wavetable.types.instrument import Instr, LOOP, RELEASE
 from wavetable.util.math import nearest_sub_harmonic
 from wavetable.util.parsing import safe_eval
@@ -126,14 +126,8 @@ class WaveReader:
         wav_path = str(cfg_dir / cfg.wav_path)
 
         # Load WAV file
-        with warnings.catch_warnings():
-            # Polyphone SF2 rips contain 'smpl' chunk with loop data
-            warnings.simplefilter("ignore")
-            self.sr, self.wav = wavfile.read(wav_path)  # type: int, np.ndarray
-            if self.wav.ndim > 1:
-                self.wav = self.wav[:, 0]   # TODO power_merge stereo samples
+        self.sr, self.wav = load_wave(wav_path)
 
-        self.wav = self.wav.astype(float)   # TODO divide by peak
         if cfg.pitch_estimate:
             self.freq_estimate = midi2freq(cfg.pitch_estimate)
         else:
@@ -166,6 +160,9 @@ class WaveReader:
 
         if cfg.vol_range:
             self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
+
+        # Channel merger (arguments irrelevant since we only use merge_ffts())
+        self.merger = Merge(maxrange=None, fft='v1')
 
     def read(self) -> Instr:
         """ read_at() one wave per frame.
@@ -220,56 +217,75 @@ class WaveReader:
 
     def _wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
         """ Pure function, no side effects.
-        Computes STFT at sample, rounds wave to cfg.range.
+
+        loop channels: computes frequency.
+        loop channels: computes STFT and periodic FFT.
+
+        Merges FFTs and creates wave. Rounds wave to cfg.range.
+
         Returns wave, frequency, and volume.
         """
 
-        # Get STFT. Extract ~~power~~ from bins into new waveform's Fourier buffer.
+        data_channels = self.data_channels_at(sample_offset)
+        channels_data = data_channels.T
+        del data_channels
 
-        data = self.raw_at(sample_offset)
-        stft = self.stft(sample_offset)
+        stft_nsamp = len(channels_data[0])
 
-        if self.freq_estimate:
-            # cyc/s * time/window = cyc/window
-            approx_bin = self.freq_estimate * self.segment_time
-            fft_peak = freq_from_autocorr(data, len(data))
-            freq_bin = nearest_sub_harmonic(fft_peak, approx_bin)
+        # Estimated frequency of each audio channel. Units = FFT bins.
+        freq_bins = []
+        for data in channels_data:
+            if self.freq_estimate:
+                # cyc/s * time/window = cyc/window
+                approx_bin = self.freq_estimate * self.segment_time
+                fft_peak = freq_from_autocorr(data, len(data))
+                freq_bin = nearest_sub_harmonic(fft_peak, approx_bin)
+            else:
+                freq_bin = freq_from_autocorr(data, len(data))
+            freq_bins.append(freq_bin)
 
-        else:
-            freq_bin = freq_from_autocorr(data, len(data))
+        avg_freq_bin = np.mean(freq_bins)   # type: float
 
-        result_fft = []
+        # Calculate STFT of each channel.
+        ffts = []
+        for data in channels_data:
+            freq_bin = avg_freq_bin     # TODO stereo uses average or channel freq?
 
-        for harmonic in range(gauss.nyquist_inclusive(self.cfg.nsamp)):
-            # print(harmonic)
-            begin = freq_bin * (harmonic - 0.5)
-            end = freq_bin * (harmonic + 0.5)
-            # print(begin, end)
-            bands = stft[math.ceil(begin):math.ceil(end)]
-            # TODO if bands are uncorrelated, self.power_sum is better
-            amplitude = np.sum(bands)   # type: complex
-            if harmonic > 0:
-                amplitude *= self.transfer(harmonic)
-            result_fft.append(amplitude)
+            stft = self.stft(data)
+            result_fft = []
 
-        wave = self.irfft(result_fft)
+            # Convert STFT to periodic FFT.
+            for harmonic in range(gauss.nyquist_inclusive(self.cfg.nsamp)):
+                begin = freq_bin * (harmonic - 0.5)
+                end = freq_bin * (harmonic + 0.5)
+
+                bands = stft[math.ceil(begin):math.ceil(end)]
+                # if bands are uncorrelated, self.power_sum is better
+                amplitude = np.sum(bands)   # type: complex
+                result_fft.append(amplitude)
+
+            ffts.append(result_fft)
+
+        # Find average FFT.
+        avg_fft = self.merger.merge_ffts(ffts, self.transfer)
+
+        # Create periodic wave.
+        wave = self.irfft(avg_fft)
         if self.cfg.range:
             wave, peak = self.rescaler.rescale_peak(wave)
         else:
             peak = 1
 
-        freq_hz = freq_bin / len(data) * self.sr
-
+        freq_hz = avg_freq_bin / stft_nsamp * self.sr
         return wave, freq_hz, peak
 
-    def stft(self, sample_offset):
+    def stft(self, data: np.ndarray) -> np.ndarray:
         """ Phasor phases will match center of data, or peak of window. """
-        data = self.raw_at(sample_offset)
         data *= self.window
         phased_data = np.roll(data, len(data) // 2)
         return fourier.rfft_norm(phased_data)
 
-    def raw_at(self, sample_offset):
+    def data_channels_at(self, sample_offset):
         if sample_offset + self.segment_smp >= len(self.wav):
             sample_offset = len(self.wav) - self.segment_smp
         data = self.wav[sample_offset:sample_offset + self.segment_smp]  # type: np.ndarray
