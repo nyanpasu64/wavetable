@@ -2,6 +2,7 @@ import math
 import sys
 import warnings
 from contextlib import redirect_stdout
+from enum import IntEnum
 from pathlib import Path
 from typing import Tuple, Sequence, Optional, Union
 
@@ -117,6 +118,49 @@ def n163_cfg(**kwargs):
     return WaveReaderConfig(**kwargs)
 
 
+class StereoMode(IntEnum):
+    ALL = 1
+    LEFT = 2
+
+    @classmethod
+    def parse(cls, value):
+        try:
+            if not isinstance(value, cls):
+                value = cls[value]
+        except KeyError:
+            # noinspection PyUnresolvedReferences
+            raise ValueError(
+                f'invalid {cls.name} {value} not in '
+                f'{[el.name for el in cls]}')
+
+
+class Wave:
+    data: 'np.ndarray'  # [index][chan]
+
+    def __init__(self, wav_path: str, stereo: StereoMode = 'all'):
+        with warnings.catch_warnings():
+            # Polyphone SF2 rips contain 'smpl' chunk with loop data
+            warnings.simplefilter("ignore")
+            self.sr, self.data = wavfile.read(wav_path)  # type: int, np.ndarray
+
+        self.nsamp = len(self.data)
+
+        # Cast to data[index][chan]
+        if self.data.ndim == 1:
+            self.data = self.data.reshape(len(self.data), 1)
+
+        # Cast to desired stereo layout
+        stereo = StereoMode.parse(stereo)
+        if stereo == StereoMode.ALL:
+            pass
+        elif stereo == StereoMode.LEFT:
+            self.data = self.data[:, [0]]
+        else:
+            raise ValueError(f"Wave cannot handle StereoMode={stereo}")
+
+        self.data = self.data.astype(np.float32)   # TODO divide by peak
+
+
 class WaveReader:
     ntick: Optional[int]
 
@@ -126,17 +170,10 @@ class WaveReader:
         assert cfg_dir.is_dir()
         self.cfg_dir = cfg_dir
 
-        wav_path = str(cfg_dir / cfg.wav_path)
-
         # Load WAV file
-        with warnings.catch_warnings():
-            # Polyphone SF2 rips contain 'smpl' chunk with loop data
-            warnings.simplefilter("ignore")
-            self.sr, self.wav = wavfile.read(wav_path)  # type: int, np.ndarray
-            if self.wav.ndim > 1:
-                self.wav = self.wav[:, 0]   # TODO power_merge stereo samples
+        wav_path = str(cfg_dir / cfg.wav_path)
+        self.wave = Wave(wav_path)
 
-        self.wav = self.wav.astype(float)   # TODO divide by peak
         if cfg.pitch_estimate:
             self.freq_estimate = midi2freq(cfg.pitch_estimate)
         else:
@@ -184,7 +221,7 @@ class WaveReader:
         if self.cfg.nwave:
             stop_samp = (start_frame + self.cfg.nwave) * nsamp_frame
         else:
-            stop_samp = len(self.wav) - self.cfg.before_end * nsamp_frame
+            stop_samp = self.wave.nsamp - self.cfg.before_end * nsamp_frame
 
         # read_at() for every frame in the audio file.
         sample_offsets = list(range(start_samp, stop_samp, nsamp_frame))
@@ -261,7 +298,7 @@ class WaveReader:
         else:
             peak = 1
 
-        freq_hz = freq_bin / len(data) * self.sr
+        freq_hz = freq_bin / len(data) * self.wave.sr
 
         return wave, freq_hz, peak
 
@@ -273,13 +310,13 @@ class WaveReader:
         return fourier.rfft_norm(phased_data)
 
     def raw_at(self, sample_offset):
-        if sample_offset + self.segment_smp >= len(self.wav):
-            sample_offset = len(self.wav) - self.segment_smp
+        if sample_offset + self.segment_smp >= self.wave.nsamp:
+            sample_offset = self.wave.nsamp - self.segment_smp
         data = self.wav[sample_offset:sample_offset + self.segment_smp]  # type: np.ndarray
         return data.copy()
 
     def smp_time(self, time):
-        return int(time * self.sr)
+        return int(time * self.wave.sr)
 
     def time_frame(self, frame):
         return frame * self.frame_time
@@ -288,7 +325,7 @@ class WaveReader:
         return int(time / self.frame_time)
 
     def time_smp(self, sample):
-        return sample / self.sr
+        return sample / self.wave.sr
 
 
 if __name__ == '__main__':
