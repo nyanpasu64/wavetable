@@ -44,7 +44,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
                       if cfg_path.suffix == CFG_EXT and cfg_path.is_file())
 
         if not cfgs:
-            raise click.ClickException(f'Wave directory {wav_dir} has no .cfg files')
+            raise click.ClickException(f'Wave directory {wav_dir} has no {CFG_EXT} files')
 
         metadata_list: Dict[str, dict] = {}
 
