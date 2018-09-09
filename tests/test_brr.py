@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 def get_cfg_dict(nwave) -> dict:
     cfg_dict = yaml.load('''\
 wav_path: Sample 19.wav
-pitch_estimate: 74
+root_pitch: 74
 nwave: ~
 
 fps: 30

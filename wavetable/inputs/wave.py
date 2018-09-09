@@ -24,8 +24,9 @@ class StereoMode(IntEnum):
 
 
 # FIXME rename to read_wave
+# Note: stereo=LEFT is not configurable and always equals ALL.
 def load_wave(wav_path: str, stereo=StereoMode.ALL) -> Tuple[int, np.ndarray]:
-    """Loads wave from file. Optionally merges data. Returns sr, data[index][chan]. """
+    """Loads wave from file. Optionally merges data. Returns smp_s, data[index][chan]. """
 
     # Polyphone SF2 wavs contain 'smpl' chunk with loop data
     with warnings.catch_warnings():

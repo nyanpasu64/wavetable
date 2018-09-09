@@ -264,3 +264,11 @@ def test_reader_stereo(stereo_read):
 
     for i, wave in enumerate(waves):
         assert not (wave == wave[0]).all(), i
+
+
+from wavetable.wave_reader import yaml
+
+def test_reader_multi_waves():
+    cfg_str = '''\
+
+'''
