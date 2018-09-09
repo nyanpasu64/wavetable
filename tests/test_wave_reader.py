@@ -8,8 +8,9 @@ import pytest
 
 from wavetable.types.instrument import Instr
 from wavetable.util.math import ceildiv
-from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg, WaveReaderConfig
-
+from wavetable.util.fs import pushd
+from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg, WaveReaderConfig, \
+    recursive_load_yaml
 
 CFG_DIR = Path('tests')
 WAV_PATH = Path('test_waves/Sample 19.wav')
@@ -244,6 +245,15 @@ def test_reader_stft_merge(cfg, stft_merge):
 
     # TODO check instr is legit
     assert instr
+
+
+def test_cfg_include():
+    """Ensure file inclusion works."""
+    with pushd('tests'):
+        assert recursive_load_yaml('library.n163') == {'library': 1, 'override': 1}
+        assert recursive_load_yaml('user.n163') == {'library': 1, 'override': 2, 'user': 3}
+        with pytest.raises(ValueError):
+            recursive_load_yaml('recursion.n163')
 
 
 # Stereo tests

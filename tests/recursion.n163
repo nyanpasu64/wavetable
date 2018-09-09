@@ -1,0 +1,2 @@
+foo: 1
+include: test_waves/../recursion.n163

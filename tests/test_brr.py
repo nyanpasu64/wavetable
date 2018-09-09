@@ -1,23 +1,12 @@
-import os
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from wavetable.to_brr import process_cfg, ExtractorConfig, \
     WAV_SUBDIR, yaml
+from wavetable.util.fs import pushd
 
 if TYPE_CHECKING:
     pass
-
-
-@contextmanager
-def pushd(new_dir: Union[Path, str]):
-    previous_dir = os.getcwd()
-    os.chdir(str(new_dir))
-    try:
-        yield
-    finally:
-        os.chdir(previous_dir)
 
 
 def get_cfg_dict(nwave) -> dict:

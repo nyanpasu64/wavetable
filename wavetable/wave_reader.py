@@ -2,11 +2,11 @@ import math
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Tuple, Sequence, Optional, Union
+from typing import Tuple, Sequence, Optional, Union, List
 
 import click
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, InitVar
 from ruamel.yaml import YAML
 from waveform_analysis.freq_estimation import freq_from_autocorr
 
@@ -68,8 +68,7 @@ def process_cfg(cfg_path: Path, dest_dir: Path):
     cfg_path = cfg_path.resolve()
     cfg_dir = cfg_path.parent
 
-    yaml = YAML(typ='safe')
-    file_cfg = yaml.load(cfg_path)
+    file_cfg = recursive_load_yaml(cfg_path)
     cfg = WaveReaderConfig(**file_cfg)
 
     # dest
@@ -81,6 +80,32 @@ def process_cfg(cfg_path: Path, dest_dir: Path):
 
             note = cfg.pitch_estimate
             instr.print(note)
+
+
+yaml = YAML()
+
+
+def recursive_load_yaml(cfg_path, parents=None):
+    if parents is None:
+        parents = []
+
+    cfg_path = Path(cfg_path).resolve()
+    if cfg_path in parents:
+        raise ValueError(f'infinite recursion detected: {parents} -> {cfg_path}')
+    parents.append(cfg_path)
+
+    file_cfg: dict = yaml.load(cfg_path)
+
+    # Inheritance
+    if 'include' in file_cfg:
+        include = file_cfg['include']
+        del file_cfg['include']
+
+        include_cfg = recursive_load_yaml(include, parents)
+        for k, v in include_cfg.items():
+            file_cfg.setdefault(k, v)
+
+    return file_cfg
 
 
 @dataclass
