@@ -234,6 +234,18 @@ def test_reader_subsample():
             check(instr.freqs)
 
 
+# STFT tests
+
+@pytest.mark.parametrize('stft_merge', ['power', 'sum'])
+def test_reader_stft_merge(cfg, stft_merge):
+    cfg.stft_merge = stft_merge
+    read = WaveReader(CFG_DIR, cfg)
+    instr = read.read()
+
+    # TODO check instr is legit
+    assert instr
+
+
 # Stereo tests
 
 def test_reader_stereo(stereo_read):

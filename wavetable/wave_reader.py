@@ -105,6 +105,7 @@ class WaveReaderConfig:
 
     # STFT configuration
     fft_mode: str = 'zoh'
+    stft_merge: str = 'power'
     width_ms: float = '1000 / 30'  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
     phase_f: Optional[str] = None
@@ -187,7 +188,15 @@ class WaveReader:
         self.segment_time = self.time_smp(self.segment_smp)
 
         self.window = np.hanning(self.segment_smp)
-        self.power_sum = wave_util.power_merge
+
+        stft_merge = cfg.stft_merge
+        if stft_merge == 'power':
+            self.power_sum = wave_util.power_merge
+        elif stft_merge == 'sum':
+            self.power_sum = np.sum
+        else:
+            raise ValueError(f'stft_merge=[power, sum] (you supplied {stft_merge})')
+
         self.transfer = eval(cfg.transfer)
         if cfg.phase_f:
             self.phase_f = eval(cfg.phase_f)
@@ -310,7 +319,7 @@ class WaveReader:
 
                 bands = stft[math.ceil(begin):math.ceil(end)]
                 # if bands are uncorrelated, self.power_sum is better
-                amplitude = np.sum(bands)   # type: complex
+                amplitude = self.power_sum(bands)   # type: complex
                 result_fft.append(amplitude)
 
             ffts.append(result_fft)
