@@ -1,6 +1,6 @@
 # noinspection PyUnresolvedReferences
 import numpy as np
-from wavetable.dsp.fourier import _zero_pad, rfft_norm, irfft_norm, rfft_zoh, irfft_zoh, \
+from wavetable.dsp.fourier import zero_pad, rfft_norm, irfft_norm, rfft_zoh, irfft_zoh, \
     nyquist_real_idx, rfft_length
 
 
@@ -39,7 +39,7 @@ def test_nyquist_inclusive():
 
 def test_irfft():
     zoh1 = rfft_norm(pulse)
-    zoh3 = _zero_pad(zoh1, 3)
+    zoh3 = zero_pad(zoh1, 3)
     ipulse3 = irfft_norm(zoh3)
     assert_close(ipulse3, pulse3)
 
@@ -57,7 +57,7 @@ def test_irfft_zoh():
 
 def test_irfft_pad():
     zoh1 = rfft_zoh(pulse)
-    zoh3 = _zero_pad(zoh1, 3)
+    zoh3 = zero_pad(zoh1, 3)
     ipulse3 = irfft_zoh(zoh3)
     assert_close(ipulse3, pulse3)
 
@@ -71,7 +71,7 @@ def test_integration():
     zoh1 = rfft_zoh(long_pulse)
     assert np.allclose(zoh1.imag, 0)
     zoh1 = zoh1.real
-    zoh3 = _zero_pad(zoh1, FACTOR)
+    zoh3 = zero_pad(zoh1, FACTOR)
     ipulse3 = irfft_zoh(zoh3, len(long_pulse))
     assert_close(ipulse3, pulse3)
 
@@ -85,6 +85,6 @@ def test_multiscale():
 """ One useful property is that fft([wave] * x) is identical to zero_pad(fft(wave), x). """
 def test_repeat():
     cat = rfft_zoh(pulse * 3)
-    pad = _zero_pad(rfft_zoh(pulse), 3)
+    pad = zero_pad(rfft_zoh(pulse), 3)
     assert_close(cat, pad)
     assert not np.allclose(cat, rfft_norm(pulse * 3))
