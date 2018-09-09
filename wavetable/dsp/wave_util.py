@@ -136,8 +136,16 @@ class Rescaler:
 
 # Pitch conversion
 
-def midi2freq(pitch: int):
-    freq = 440 * 2 ** ((pitch - 69) / 12)
+
+def midi2ratio(note, cents=0):
+    """ Converts semitones to a frequency ratio. """
+    ratio = 2 ** ((note + cents / 100) / 12)
+    return ratio
+
+
+def midi2freq(note, cents=0):
+    """ Converts a MIDI note to an absolute frequency (Hz). """
+    freq = 440 * midi2ratio(note - 69, cents)
     return freq
 
 
