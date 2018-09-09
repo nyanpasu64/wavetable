@@ -99,11 +99,12 @@ class Rescaler:
     # def __call__(self, ys):
     #     return self.rescale_quantize(ys, ret_tuple)
 
-    def rescale_peak(self, ys: np.ndarray):
+    def rescale_peak(self, ys):
         """
         :param ys: waveform
         :return: (rescaled waveform, peak amplitude)
         """
+        ys = np.asarray(ys)
         max_range = self.max_range
 
         if self.rounding == 'round':

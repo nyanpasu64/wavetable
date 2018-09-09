@@ -107,6 +107,7 @@ class WaveReaderConfig:
     fft_mode: str = 'normal'
     width_ms: float = '1000 / 30'  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
+    phase_f: Optional[str] = None
 
     # Output bit depth and rounding
     range: Optional[int] = 16
@@ -188,6 +189,10 @@ class WaveReader:
         self.window = np.hanning(self.segment_smp)
         self.power_sum = wave_util.power_merge
         self.transfer = eval(cfg.transfer)
+        if cfg.phase_f:
+            self.phase_f = eval(cfg.phase_f)
+        else:
+            self.phase_f = None
 
         fft_mode = cfg.fft_mode
         if fft_mode == 'normal':
@@ -255,7 +260,8 @@ class WaveReader:
 
         waves = wave_util.align_waves(waves)
         if self.cfg.vol_range:
-            vols = self.vol_rescaler.rescale(vols)
+            vols, peak = self.vol_rescaler.rescale_peak(vols)
+            print(f'peak = {peak}')
         return Instr(waves, freqs=freqs, vols=vols)
 
     def _wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
@@ -311,6 +317,17 @@ class WaveReader:
 
         # Find average FFT.
         avg_fft = self.merger.merge_ffts(ffts, self.transfer)
+
+        # Reassign phases.
+        if self.phase_f:
+            # Don't rephase the DC bin.
+            first_bin = 1
+
+            phases = self.phase_f(np.arange(first_bin, len(avg_fft)))
+            phasors = np.exp(1j * phases)
+
+            avg_fft = np.abs(avg_fft).astype(complex)
+            avg_fft[first_bin:] *= phasors
 
         # Create periodic wave.
         wave = self.irfft(avg_fft)
