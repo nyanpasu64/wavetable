@@ -1,6 +1,7 @@
 # noinspection PyUnresolvedReferences
 import numpy as np
-from wavetable.dsp.fourier import _zero_pad, rfft_norm, irfft_norm, rfft_zoh, irfft_zoh
+from wavetable.dsp.fourier import _zero_pad, rfft_norm, irfft_norm, rfft_zoh, irfft_zoh, \
+    nyquist_real_idx, rfft_length
 
 
 def assert_close(a, b):
@@ -14,6 +15,26 @@ expected = [0.25] * 3
 
 fft1 = rfft_norm(pulse)
 assert_close(fft1, expected)
+
+
+def test_nyquist_real():
+    assert nyquist_real_idx(4) == 2
+    assert nyquist_real_idx(5) == 3
+
+
+def test_nyquist_inclusive():
+    assert rfft_length(4) == 3
+    assert rfft_length(5) == 3
+
+    # A 16-sample wave has harmonics [0..8] with length 9.
+    assert rfft_length(16, 1) == 9
+
+    # Bandlimiting its second harmonic produces harmonics [0,2,4,6,8] with length 5.
+    assert rfft_length(16, 2) == 5
+
+    # Bandlimiting its third harmonic produces harmonics [0,3,6] with length 3.
+    assert rfft_length(16, 3) == 3
+
 
 
 def test_irfft():

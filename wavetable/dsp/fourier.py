@@ -1,11 +1,18 @@
 from typing import List, Union
 
 import numpy as np
-from wavetable.dsp.gauss import nyquist_exclusive, nyquist_inclusive
 
 
-# I don't know why, but "inclusive" makes my test cases work.
-NYQUIST = nyquist_inclusive
+def nyquist_real_idx(n):
+    return (n + 1) // 2
+
+
+def rfft_length(n, upsampling=1):
+    return n // upsampling // 2 + 1
+
+
+# I don't know why, but "rfft_length" makes my test cases work.
+NYQUIST = rfft_length
 
 
 def _zoh_transfer(nsamp):
@@ -30,7 +37,7 @@ def rfft_zoh(signal: InputWave) -> SpectrumType:
     nsamp = len(signal)
     spectrum = rfft_norm(signal)
 
-    # Muffle everything ~~but Nyquist~~, like real hardware.
+    # Muffle everything, like real hardware.
     # Nyquist is already real.
     nyquist = NYQUIST(nsamp)
     spectrum[:nyquist] *= _zoh_transfer(nsamp)
@@ -51,10 +58,10 @@ def irfft_zoh(spectrum: InputSpectrum, nsamp=None) -> WaveType:
 
     spectrum = np.copy(spectrum[:nin])
 
-    # Treble-boost everything ~~but Nyquist~~.
+    # Treble-boost everything.
     # Make Nyquist purely real.
     nyquist = NYQUIST(nsamp)
-    real = nyquist_exclusive(nsamp)
+    real = nyquist_real_idx(nsamp)
 
     spectrum[:nyquist] /= _zoh_transfer(nsamp)
     spectrum[real:] = _realify(spectrum[real:])

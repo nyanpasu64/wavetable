@@ -10,8 +10,9 @@ from dataclasses import dataclass, InitVar
 from ruamel.yaml import YAML
 from waveform_analysis.freq_estimation import freq_from_autocorr
 
-from wavetable.dsp import fourier, gauss, wave_util, transfers
+from wavetable.dsp import fourier, wave_util, transfers
 from wavetable.dsp.wave_util import Rescaler, midi2freq
+from wavetable.dsp.fourier import rfft_length
 from wavetable.inputs.wave import load_wave
 from wavetable.merge import Merge
 from wavetable.types.instrument import Instr, LOOP, RELEASE
@@ -338,7 +339,7 @@ class WaveReader:
             result_fft = []
 
             # Convert STFT to periodic FFT.
-            for harmonic in range(gauss.nyquist_inclusive(self.cfg.nsamp)):
+            for harmonic in range(rfft_length(self.cfg.nsamp)):
                 begin = freq_bin * (harmonic - 0.5)
                 end = freq_bin * (harmonic + 0.5)
 
