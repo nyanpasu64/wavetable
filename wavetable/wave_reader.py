@@ -104,7 +104,7 @@ class WaveReaderConfig:
     sweep: Union[str, list] = ''        # FTI playback indices. Unused waves will be removed.
 
     # STFT configuration
-    fft_mode: str = 'normal'
+    fft_mode: str = 'zoh'
     width_ms: float = '1000 / 30'  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
     phase_f: Optional[str] = None

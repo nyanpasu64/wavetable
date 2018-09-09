@@ -65,6 +65,9 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
 
 @dataclass
 class WavetableConfig(WaveReaderConfig):
+    # override default
+    fft_mode: str = 'normal'
+
     no_brr: bool = False
     unlooped_prefix: int = 0        # Controls the loop point of the wave.
     truncate_prefix: bool = True    # Remove unlooped prefix from non-initial samples
