@@ -4,6 +4,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Tuple, Sequence, Optional, Union
 
+import click
 import numpy as np
 from dataclasses import dataclass
 from ruamel.yaml import YAML
@@ -22,16 +23,58 @@ assert transfers  # module used by cfg.transfer
 # np.loge = np.ln = np.log
 
 
-def main(cfg_path):
-    cfg_path = Path(cfg_path).resolve()
+Folder = click.Path(exists=True, file_okay=False)
+CFG_EXT = '.n163'
+
+
+@click.command()
+@click.argument('WAV_DIRS', type=Folder, nargs=-1, required=True)
+@click.argument('DEST_DIR', type=Folder)
+def main(wav_dirs: Sequence[str], dest_dir: str):
+    """
+    config.n163 is a YAML file:
+
+    file: "filename.wav"        # quotes are optional
+    nsamp: 64
+    pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
+                                # This tool may estimate the wrong octave, if line is missing.
+                                # Exclude if WAV file has pitch changes 1 octave or greater.
+    at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
+                                # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
+                                # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
+    [optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
+    [optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
+    [optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+    """
+    dest_dir = Path(dest_dir)
+
+    for wav_dir in wav_dirs:
+        wav_dir = Path(wav_dir)
+        print(wav_dir)
+
+        cfgs = sorted(cfg_path for cfg_path in wav_dir.iterdir()
+                      if cfg_path.suffix == CFG_EXT and cfg_path.is_file())
+
+        if not cfgs:
+            raise click.ClickException(f'Wave directory {wav_dir} has no {CFG_EXT} files')
+
+        for cfg_path in cfgs:
+            print(cfg_path)
+            process_cfg(cfg_path, dest_dir)
+
+
+def process_cfg(cfg_path: Path, dest_dir: Path):
+    # cfg
+    cfg_path = cfg_path.resolve()
     cfg_dir = cfg_path.parent
 
     yaml = YAML(typ='safe')
     file_cfg = yaml.load(cfg_path)
-
     cfg = WaveReaderConfig(**file_cfg)
 
-    with open(str(cfg_path) + '.txt', 'w') as f:
+    # dest
+    dest_path = dest_dir / (cfg_path.name + '.txt')
+    with dest_path.open('w') as f:
         with redirect_stdout(f):
             read = WaveReader(cfg_dir, cfg)
             instr = read.read()
@@ -305,23 +348,23 @@ class WaveReader:
 
 
 if __name__ == '__main__':
-    if 1 < len(sys.argv):
-        main(sys.argv[1])
-    else:
-        message = 'Usage: %s config.n163' % Path(__file__).name + '''
+    main()
 
-config.n163 is a YAML file:
-
-file: "filename.wav"        # quotes are optional
-nsamp: N163 wave length
-pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
-                                # This tool may estimate the wrong octave, if line is missing.
-                                # Exclude if WAV file has pitch changes 1 octave or greater.
-at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
-                                # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
-                                # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
-[optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
-[optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
-[optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
-'''
-        print(message, file=sys.stderr)
+#     # FIXME
+#     message = 'Usage: %s config.n163' % Path(__file__).name + '''
+#
+# config.n163 is a YAML file:
+#
+# file: "filename.wav"        # quotes are optional
+# nsamp: 64
+# pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
+#                             # This tool may estimate the wrong octave, if line is missing.
+#                             # Exclude if WAV file has pitch changes 1 octave or greater.
+# at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
+#                             # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
+#                             # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
+# [optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
+# [optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
+# [optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+# '''
+#     print(message, file=sys.stderr)
