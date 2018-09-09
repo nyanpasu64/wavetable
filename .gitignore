@@ -176,3 +176,4 @@ fabric.properties
 */test_waves/*.wtcfg
 */test_waves/temp-wav
 */test_waves/dest
+.directory
