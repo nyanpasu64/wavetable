@@ -1,5 +1,5 @@
 import math
-from typing import NamedTuple, TypeVar
+from typing import NamedTuple
 
 import numpy as np
 from numpy.fft import ifft, fft
@@ -135,19 +135,6 @@ class Rescaler:
 
 
 # Pitch conversion
-
-def midi2freq(pitch: int):
-    freq = 440 * 2 ** ((pitch - 69) / 12)
-    return freq
-
-
-Numbers = TypeVar('Numbers', float, np.ndarray)
-
-
-def freq2midi(freq: Numbers) -> Numbers:
-    freq_ratio = freq / 440
-    semitones = 12 * (np.log(freq_ratio) / np.log(2))
-    return semitones + 69
 
 
 TICKS_PER_SEMITONE = 32

@@ -1,6 +1,7 @@
 # noinspection PyUnresolvedReferences
 import numpy as np
-from wavetable.dsp.fourier import _zero_pad, rfft_norm, irfft_norm, rfft_zoh, irfft_zoh
+from wavetable.dsp.fourier import zero_pad, rfft_norm, irfft_norm, rfft_zoh, irfft_zoh, \
+    nyquist_real_idx, rfft_length
 
 
 def assert_close(a, b):
@@ -16,9 +17,29 @@ fft1 = rfft_norm(pulse)
 assert_close(fft1, expected)
 
 
+def test_nyquist_real():
+    assert nyquist_real_idx(4) == 2
+    assert nyquist_real_idx(5) == 3
+
+
+def test_nyquist_inclusive():
+    assert rfft_length(4) == 3
+    assert rfft_length(5) == 3
+
+    # A 16-sample wave has harmonics [0..8] with length 9.
+    assert rfft_length(16, 1) == 9
+
+    # Bandlimiting its second harmonic produces harmonics [0,2,4,6,8] with length 5.
+    assert rfft_length(16, 2) == 5
+
+    # Bandlimiting its third harmonic produces harmonics [0,3,6] with length 3.
+    assert rfft_length(16, 3) == 3
+
+
+
 def test_irfft():
     zoh1 = rfft_norm(pulse)
-    zoh3 = _zero_pad(zoh1, 3)
+    zoh3 = zero_pad(zoh1, 3)
     ipulse3 = irfft_norm(zoh3)
     assert_close(ipulse3, pulse3)
 
@@ -36,7 +57,7 @@ def test_irfft_zoh():
 
 def test_irfft_pad():
     zoh1 = rfft_zoh(pulse)
-    zoh3 = _zero_pad(zoh1, 3)
+    zoh3 = zero_pad(zoh1, 3)
     ipulse3 = irfft_zoh(zoh3)
     assert_close(ipulse3, pulse3)
 
@@ -50,7 +71,7 @@ def test_integration():
     zoh1 = rfft_zoh(long_pulse)
     assert np.allclose(zoh1.imag, 0)
     zoh1 = zoh1.real
-    zoh3 = _zero_pad(zoh1, FACTOR)
+    zoh3 = zero_pad(zoh1, FACTOR)
     ipulse3 = irfft_zoh(zoh3, len(long_pulse))
     assert_close(ipulse3, pulse3)
 
@@ -64,6 +85,6 @@ def test_multiscale():
 """ One useful property is that fft([wave] * x) is identical to zero_pad(fft(wave), x). """
 def test_repeat():
     cat = rfft_zoh(pulse * 3)
-    pad = _zero_pad(rfft_zoh(pulse), 3)
+    pad = zero_pad(rfft_zoh(pulse), 3)
     assert_close(cat, pad)
     assert not np.allclose(cat, rfft_norm(pulse * 3))

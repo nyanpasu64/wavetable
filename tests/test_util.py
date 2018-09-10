@@ -1,6 +1,7 @@
 import numpy as np
 
-from wavetable.dsp.wave_util import A, freq2midi
+from wavetable.dsp.wave_util import A
+from wavetable.util.math import midi2ratio, midi2freq, freq2midi
 
 
 def test_freq2midi():
@@ -12,3 +13,13 @@ def test_freq2midi():
 
     midi = freq2midi(freq)
     np.testing.assert_allclose(midi, midi_expected)
+
+
+def test_midi2freq():
+    assert midi2freq(69) == 440
+    assert midi2freq(69-12) == 220
+
+
+def test_midi2ratio():
+    assert midi2ratio(12) == 2
+    assert midi2ratio(-12) == .5

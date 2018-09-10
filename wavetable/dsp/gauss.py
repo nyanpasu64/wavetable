@@ -1,4 +1,7 @@
+# This file is finally useless and dead. Press F to pay respects.
+
 import numpy as np
+
 from wavetable.types.instrument import S
 
 
@@ -159,16 +162,3 @@ def rotate(z, theta):
     return z * np.exp(1j * theta)
 
 
-def nyquist_exclusive(n):
-    return (n + 1) // 2
-
-
-def nyquist_inclusive(n):
-    return n // 2 + 1
-
-
-assert nyquist_exclusive(4) == 2
-assert nyquist_inclusive(4) == 3
-
-assert nyquist_exclusive(5) == 3
-assert nyquist_inclusive(5) == 3

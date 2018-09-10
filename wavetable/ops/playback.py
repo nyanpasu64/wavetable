@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from wavetable.dsp.wave_util import midi2freq
+from wavetable.util.math import midi2freq
 
 CPU_NTSC = 1.79e6
 FPS = 60
