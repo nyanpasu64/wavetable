@@ -234,17 +234,18 @@ class File:
                  cfg: FileConfig,
                  wcfg: WaveReaderConfig,
                  power_sum: Callable[[Sequence[complex]], complex]):
-        """
-        it's complicated.
+        """ Wraps a single .wav file, and extracts periodic FFTs at specified times. """
 
-        speeding up file by
-        """
         self.power_sum = power_sum
         self.cfg = cfg
         self.wcfg = wcfg
 
         wav_path = str(cfg_dir / cfg.path)
         self.smp_s, self.wav = load_wave(wav_path)
+
+        # Scale by volume
+        self.wav = self.wav.astype(float) * cfg.volume
+
         self.fundamental_freq = midi2freq(cfg.pitch_estimate)
 
         # Shift speed to multiple of root pitch.
