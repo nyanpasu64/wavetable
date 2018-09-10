@@ -194,6 +194,7 @@ class Instr:
         self.sweep[:] = used2out
 
     def print(self, *args):
+        # TODO test this function
         self.print_waves()
 
         if self.vols is not None:

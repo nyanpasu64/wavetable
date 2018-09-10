@@ -450,6 +450,7 @@ class WaveReader:
             vols.append(peak)
 
         waves = wave_util.align_waves(waves)
+        peak = None
         if self.cfg.vol_range:
             vols, peak = self.vol_rescaler.rescale_peak(vols)
         return Instr(waves, freqs=freqs, vols=vols, peak=peak)
