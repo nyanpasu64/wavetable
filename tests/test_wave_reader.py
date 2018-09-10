@@ -14,7 +14,9 @@ from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg, WaveReade
     recursive_load_yaml
 from wavetable.wave_reader import yaml
 
+
 CFG_DIR = Path('tests')
+WAVE_DIR = CFG_DIR / 'test_waves'
 WAV_PATH = Path('test_waves/Sample 19.wav')
 NSAMP = 128
 NWAVE = 30
@@ -168,6 +170,57 @@ def test_cfg_include():
             recursive_load_yaml('recursion.n163')
 
 
+SINE = '''\
+wav_path: sine440.69.wav
+nwave: 1
+nsamp: 16
+'''
+
+
+def test_reader_pitch_metadata():
+    """ Ensure WaveReader obtains root pitch from wav filename. """
+    cfg_dict = yaml.load(SINE)
+    # root_pitch should be obtained from filename
+    read = WaveReader(WAVE_DIR, n163_cfg(**cfg_dict))
+    read.read()
+
+    cfg_dict['wav_path'] = 'Sample 19.wav'
+    with pytest.raises(TypeError):
+        read = WaveReader(WAVE_DIR, n163_cfg(**cfg_dict))
+        read.read()
+
+
+# Phase-assignment tests
+
+def get_phase(cfg):
+    read = WaveReader(WAVE_DIR, cfg)
+    instr = read.read()
+
+    spectrum = rfft_norm(instr.waves[0])
+    phase = np.angle(spectrum[1])
+    return phase
+
+
+def test_reader_phase_f():
+    """ Ensure phase_f=lambda works. """
+    cfg = cfg_yaml(SINE)
+    tolerance = 0.01
+
+    assert abs(get_phase(cfg)) > tolerance
+
+    cfg.phase_f = 'lambda f: 0'
+    assert abs(get_phase(cfg)) < tolerance
+
+
+def test_reader_phase():
+    """ Ensure phase=float works. """
+    cfg = cfg_yaml(SINE)
+    tolerance = 0.01
+
+    cfg.phase = 0
+    assert abs(get_phase(cfg)) < tolerance
+
+
 # Stereo tests
 
 def test_reader_stereo(stereo_read):
@@ -196,7 +249,7 @@ nsamp: 16
     harmonics = [1, 2]  # plus 3 at volume=0
 
     cfg = n163_cfg(**yaml.load(cfg_str))
-    read = WaveReader(CFG_DIR / 'test_waves', cfg)
+    read = WaveReader(WAVE_DIR, cfg)
     instr = read.read()
 
     # Calculate spectrum of resulting signal
@@ -213,6 +266,8 @@ nsamp: 16
     spectrum[0] = 0
     assert (spectrum < threshold).all()
 
+
+# Fixtures
 
 @pytest.fixture(scope="module", params=[n163_cfg, unrounded_cfg])
 def cfg(request) -> WaveReaderConfig:
@@ -260,3 +315,7 @@ def stereo_cfg(stereo_path, cfg_factory) -> WaveReaderConfig:
 @pytest.fixture(scope="module")
 def stereo_read(stereo_cfg) -> WaveReader:
     return WaveReader(CFG_DIR, stereo_cfg)
+
+
+def cfg_yaml(yaml_str):
+    return n163_cfg(**yaml.load(yaml_str))
