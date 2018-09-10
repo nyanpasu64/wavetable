@@ -140,9 +140,9 @@ class Rescaler:
 TICKS_PER_SEMITONE = 32
 
 
-def freq2pitch(freq: float, reference: int):
+def freq2pitch(freq, reference: int):
     float_pitch = 12 * (np.log(freq / 440) / np.log(2)) + 69 - reference
-    linear_pitch = int(round(float_pitch * TICKS_PER_SEMITONE))
+    linear_pitch = np.around(float_pitch * TICKS_PER_SEMITONE).astype(int)
     return linear_pitch
 
 
