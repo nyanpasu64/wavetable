@@ -18,6 +18,8 @@ def nearest_sub_harmonic(precise: float, accurate: float) -> float:
     if precise > accurate:
         precise /= round(precise / accurate)
     elif precise < accurate:
+        if precise == 0:
+            return accurate
         precise *= round(accurate / precise)
     return precise
 

@@ -322,7 +322,11 @@ class File:
         # cyc/window = cyc/s * s/window
         approx_bin = self.fundamental_freq * self.segment_time
 
-        fft_peak = freq_from_autocorr(data, len(data))
+        try:
+            fft_peak = freq_from_autocorr(data, len(data))
+        except IndexError:  # unhandled exception from library code
+            fft_peak = 0
+
         freq_bin = nearest_sub_harmonic(fft_peak, approx_bin)
 
         return freq_bin
