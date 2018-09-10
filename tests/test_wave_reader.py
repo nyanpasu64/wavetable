@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from wavetable.dsp.fourier import rfft_norm
-from wavetable.types.instrument import Instr
+from wavetable.instrument import Instr
 from wavetable.util.fs import pushd
 from wavetable.util.math import ceildiv
 from wavetable.wave_reader import WaveReader, n163_cfg, unrounded_cfg, WaveReaderConfig, \

@@ -8,7 +8,7 @@ from wavetable.dsp import fourier, wave_util, transfers
 from wavetable.dsp.transfers import filter_fft
 from wavetable.dsp.fourier import InputSpectrum, WaveType, SpectrumType
 from wavetable.dsp.wave_util import Rescaler
-from wavetable.types.instrument import MergeInstr, _get, I, F, S
+from wavetable.instrument import MergeInstr, _get, I, F, S
 
 
 # todo, MML belongs in Instrument

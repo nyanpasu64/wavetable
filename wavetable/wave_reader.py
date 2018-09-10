@@ -15,7 +15,7 @@ from wavetable.dsp.fourier import rfft_length, zero_pad, SpectrumType
 from wavetable.dsp.wave_util import Rescaler
 from wavetable.inputs.wave import load_wave
 from wavetable.merge import Merge
-from wavetable.types.instrument import Instr, LOOP, RELEASE
+from wavetable.instrument import Instr, LOOP, RELEASE
 from wavetable.util.config import Alias, ConfigMixin
 from wavetable.util.math import nearest_sub_harmonic, midi2ratio, midi2freq
 from wavetable.util.parsing import safe_eval

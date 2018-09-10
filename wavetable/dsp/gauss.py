@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from wavetable.types.instrument import S
+from wavetable.instrument import S
 
 
 def cat(*args, **kwargs):
