@@ -124,7 +124,10 @@ class WaveReaderConfig(ConfigMixin):
     root_pitch: float = None
     pitch_estimate = Alias('root_pitch')
     strict_pitch: bool = False
+
     wav_path: InitVar[str] = None
+    path = Alias('wav_path')
+    file = Alias('wav_path')
     files: List[Union[dict, 'FileConfig']] = None
 
     # Frame rate and subsampling
