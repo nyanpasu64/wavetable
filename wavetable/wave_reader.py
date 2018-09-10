@@ -11,12 +11,12 @@ from waveform_analysis.freq_estimation import freq_from_autocorr
 
 from wavetable.dsp import fourier, wave_util, transfers
 from wavetable.dsp.fourier import rfft_length, zero_pad, SpectrumType
-from wavetable.dsp.wave_util import Rescaler, midi2freq, midi2ratio
+from wavetable.dsp.wave_util import Rescaler
 from wavetable.inputs.wave import load_wave
 from wavetable.merge import Merge
 from wavetable.types.instrument import Instr, LOOP, RELEASE
 from wavetable.util.config import Alias, ConfigMixin
-from wavetable.util.math import nearest_sub_harmonic
+from wavetable.util.math import nearest_sub_harmonic, midi2ratio, midi2freq
 from wavetable.util.parsing import safe_eval
 
 assert transfers  # module used by cfg.transfer

@@ -1,6 +1,7 @@
 import numpy as np
 
-from wavetable.dsp.wave_util import A, freq2midi, midi2freq, midi2ratio
+from wavetable.dsp.wave_util import A
+from wavetable.util.math import midi2ratio, midi2freq, freq2midi
 
 
 def test_freq2midi():
