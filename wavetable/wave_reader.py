@@ -157,6 +157,12 @@ class WaveReaderConfig(ConfigMixin):
             self.files = [FileConfig(wav_path, self.root_pitch)]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
+            if self.root_pitch is None:
+                if len(self.files) == 1:
+                    self.root_pitch = self.files[0].pitch_estimate
+                else:
+                    raise TypeError(
+                        'must specify root_pitch when providing multiple files')
 
         self.width_ms = safe_eval(str(self.width_ms))
         self.sweep = parse_sweep(self.sweep)
