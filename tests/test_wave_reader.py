@@ -184,7 +184,7 @@ files:
   - path: sine440.69.wav
   - path: sine440.69.wav
     speed: 2
-    volume: 2
+    volume: 1.1
   - path: sine256.59.624.wav
     speed: 3
     volume: 0

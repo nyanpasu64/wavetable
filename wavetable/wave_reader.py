@@ -26,6 +26,7 @@ assert transfers  # module used by cfg.transfer
 
 Folder = click.Path(exists=True, file_okay=False)
 CFG_EXT = '.n163'
+yaml = YAML()
 
 
 @click.command()
@@ -70,7 +71,7 @@ def process_cfg(cfg_path: Path, dest_dir: Path):
     cfg_dir = cfg_path.parent
 
     file_cfg = recursive_load_yaml(cfg_path)
-    cfg = WaveReaderConfig.new(file_cfg)
+    cfg = n163_cfg(**file_cfg)
 
     # dest
     dest_path = dest_dir / (cfg_path.name + '.txt')
@@ -82,8 +83,6 @@ def process_cfg(cfg_path: Path, dest_dir: Path):
             note = cfg.root_pitch
             instr.print(note)
 
-
-yaml = YAML()
 
 
 def recursive_load_yaml(cfg_path, parents=None):
@@ -109,10 +108,20 @@ def recursive_load_yaml(cfg_path, parents=None):
     return file_cfg
 
 
+def unrounded_cfg(**kwargs):
+    kwargs.setdefault('range', None)
+    kwargs.setdefault('vol_range', None)
+    return WaveReaderConfig.new(kwargs)
+
+
+def n163_cfg(**kwargs):
+    return WaveReaderConfig.new(kwargs)
+
+
 @dataclass
 class WaveReaderConfig(ConfigMixin):
     nsamp: int
-    root_pitch: int
+    root_pitch: float = None
     pitch_estimate = Alias('root_pitch')
     wav_path: InitVar[str] = None
     files: List[Union[dict, 'FileConfig']] = None
@@ -142,6 +151,7 @@ class WaveReaderConfig(ConfigMixin):
 
     def __post_init__(self, wav_path):
         if wav_path is not None:
+            self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
             self.files = [FileConfig(wav_path, self.root_pitch)]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
@@ -179,24 +189,39 @@ def parse_sweep(at: str) -> list:
     return out
 
 
-def unrounded_cfg(**kwargs):
-    kwargs.setdefault('range', None)
-    kwargs.setdefault('vol_range', None)
-    return WaveReaderConfig.new(kwargs)
+def parse_pitch(pitch: Optional[float], wav_path: str, why: str) -> float:
+    """ Obtain MIDI pitch from filename.
+    Examples:
+    - strings.69.wav -> 69
+    - strings.69.5.wav -> 69.5
+    """
+    if pitch is not None:
+        return pitch
 
+    wav_no_ext = Path(wav_path).stem
+    if '.' not in wav_no_ext:
+        raise TypeError(f"{why} parameter missing, not specified in wave name "
+                        f"(try '{wav_no_ext}.60.wav')")
 
-def n163_cfg(**kwargs):
-    return WaveReaderConfig.new(kwargs)
+    # Trim until first period
+    wav_meta = wav_no_ext.split('.', 1)[1]
+
+    pitch = safe_eval(wav_meta)
+    return pitch
 
 
 @dataclass
 class FileConfig(ConfigMixin):
     path: str
-    pitch_estimate: int
+    pitch_estimate: float = None
 
     volume: float = 1.0
     speed: int = 1
     repitch: int = 1
+
+    def __post_init__(self):
+        self.pitch_estimate = parse_pitch(
+            self.pitch_estimate, self.path, 'files[].pitch_estimate')
 
 
 class File:
