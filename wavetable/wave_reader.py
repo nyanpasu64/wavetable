@@ -1,46 +1,111 @@
 import math
 import sys
-import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Tuple, Sequence, Optional, Union
+from typing import Tuple, Sequence, Optional, Union, List
 
+import click
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, InitVar
 from ruamel.yaml import YAML
-from scipy.io import wavfile
 from waveform_analysis.freq_estimation import freq_from_autocorr
 
-from wavetable import fourier, transfers
-from wavetable import gauss
-from wavetable import wave_util
-from wavetable.instrument import Instr, LOOP, RELEASE
-from wavetable.playback import midi2freq
+from wavetable.dsp import fourier, gauss, wave_util, transfers
+from wavetable.dsp.wave_util import Rescaler, midi2freq
+from wavetable.inputs.wave import load_wave
+from wavetable.merge import Merge
+from wavetable.types.instrument import Instr, LOOP, RELEASE
 from wavetable.util.math import nearest_sub_harmonic
 from wavetable.util.parsing import safe_eval
-from wavetable.wave_util import Rescaler
 
-assert transfers    # module used by cfg.transfer
+assert transfers  # module used by cfg.transfer
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
 # np.loge = np.ln = np.log
 
 
-def main(cfg_path):
-    cfg_path = Path(cfg_path).resolve()
+Folder = click.Path(exists=True, file_okay=False)
+CFG_EXT = '.n163'
+
+
+@click.command()
+@click.argument('WAV_DIRS', type=Folder, nargs=-1, required=True)
+@click.argument('DEST_DIR', type=Folder)
+def main(wav_dirs: Sequence[str], dest_dir: str):
+    """
+    config.n163 is a YAML file:
+
+    file: "filename.wav"        # quotes are optional
+    nsamp: 64
+    pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
+                                # This tool may estimate the wrong octave, if line is missing.
+                                # Exclude if WAV file has pitch changes 1 octave or greater.
+    at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
+                                # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
+                                # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
+    [optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
+    [optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
+    [optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+    """
+    dest_dir = Path(dest_dir)
+
+    for wav_dir in wav_dirs:
+        wav_dir = Path(wav_dir)
+        print(wav_dir)
+
+        cfgs = sorted(cfg_path for cfg_path in wav_dir.iterdir()
+                      if cfg_path.suffix == CFG_EXT and cfg_path.is_file())
+
+        if not cfgs:
+            raise click.ClickException(f'Wave directory {wav_dir} has no {CFG_EXT} files')
+
+        for cfg_path in cfgs:
+            print(cfg_path)
+            process_cfg(cfg_path, dest_dir)
+
+
+def process_cfg(cfg_path: Path, dest_dir: Path):
+    # cfg
+    cfg_path = cfg_path.resolve()
     cfg_dir = cfg_path.parent
 
-    yaml = YAML(typ='safe')
-    file_cfg = yaml.load(cfg_path)
-
+    file_cfg = recursive_load_yaml(cfg_path)
     cfg = WaveReaderConfig(**file_cfg)
 
-    with open(str(cfg_path) + '.txt', 'w') as f:
+    # dest
+    dest_path = dest_dir / (cfg_path.name + '.txt')
+    with dest_path.open('w') as f:
         with redirect_stdout(f):
             read = WaveReader(cfg_dir, cfg)
             instr = read.read()
 
             note = cfg.pitch_estimate
             instr.print(note)
+
+
+yaml = YAML()
+
+
+def recursive_load_yaml(cfg_path, parents=None):
+    if parents is None:
+        parents = []
+
+    cfg_path = Path(cfg_path).resolve()
+    if cfg_path in parents:
+        raise ValueError(f'infinite recursion detected: {parents} -> {cfg_path}')
+    parents.append(cfg_path)
+
+    file_cfg: dict = yaml.load(cfg_path)
+
+    # Inheritance
+    if 'include' in file_cfg:
+        include = file_cfg['include']
+        del file_cfg['include']
+
+        include_cfg = recursive_load_yaml(include, parents)
+        for k, v in include_cfg.items():
+            file_cfg.setdefault(k, v)
+
+    return file_cfg
 
 
 @dataclass
@@ -64,9 +129,11 @@ class WaveReaderConfig:
     sweep: Union[str, list] = ''        # FTI playback indices. Unused waves will be removed.
 
     # STFT configuration
-    fft_mode: str = 'normal'
+    fft_mode: str = 'zoh'
+    stft_merge: str = 'power'
     width_ms: float = '1000 / 30'  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
+    phase_f: Optional[str] = None
 
     # Output bit depth and rounding
     range: Optional[int] = 16
@@ -129,14 +196,8 @@ class WaveReader:
         wav_path = str(cfg_dir / cfg.wav_path)
 
         # Load WAV file
-        with warnings.catch_warnings():
-            # Polyphone SF2 rips contain 'smpl' chunk with loop data
-            warnings.simplefilter("ignore")
-            self.sr, self.wav = wavfile.read(wav_path)  # type: int, np.ndarray
-            if self.wav.ndim > 1:
-                self.wav = self.wav[:, 0]   # TODO power_merge stereo samples
+        self.sr, self.wav = load_wave(wav_path)
 
-        self.wav = self.wav.astype(float)   # TODO divide by peak
         if cfg.pitch_estimate:
             self.freq_estimate = midi2freq(cfg.pitch_estimate)
         else:
@@ -152,8 +213,20 @@ class WaveReader:
         self.segment_time = self.time_smp(self.segment_smp)
 
         self.window = np.hanning(self.segment_smp)
-        self.power_sum = wave_util.power_merge
+
+        stft_merge = cfg.stft_merge
+        if stft_merge == 'power':
+            self.power_sum = wave_util.power_merge
+        elif stft_merge == 'sum':
+            self.power_sum = np.sum
+        else:
+            raise ValueError(f'stft_merge=[power, sum] (you supplied {stft_merge})')
+
         self.transfer = eval(cfg.transfer)
+        if cfg.phase_f:
+            self.phase_f = eval(cfg.phase_f)
+        else:
+            self.phase_f = None
 
         fft_mode = cfg.fft_mode
         if fft_mode == 'normal':
@@ -169,6 +242,9 @@ class WaveReader:
 
         if cfg.vol_range:
             self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
+
+        # Channel merger (arguments irrelevant since we only use merge_ffts())
+        self.merger = Merge(maxrange=None, fft='v1')
 
     def read(self) -> Instr:
         """ read_at() one wave per frame.
@@ -218,61 +294,92 @@ class WaveReader:
 
         waves = wave_util.align_waves(waves)
         if self.cfg.vol_range:
-            vols = self.vol_rescaler.rescale(vols)
+            vols, peak = self.vol_rescaler.rescale_peak(vols)
+            print(f'peak = {peak}')
         return Instr(waves, freqs=freqs, vols=vols)
 
     def _wave_at(self, sample_offset: int) -> Tuple[np.ndarray, float, float]:
         """ Pure function, no side effects.
-        Computes STFT at sample, rounds wave to cfg.range.
+
+        loop channels: computes frequency.
+        loop channels: computes STFT and periodic FFT.
+
+        Merges FFTs and creates wave. Rounds wave to cfg.range.
+
         Returns wave, frequency, and volume.
         """
 
-        # Get STFT. Extract ~~power~~ from bins into new waveform's Fourier buffer.
+        data_channels = self.data_channels_at(sample_offset)
+        channels_data = data_channels.T
+        del data_channels
 
-        data = self.raw_at(sample_offset)
-        stft = self.stft(sample_offset)
+        stft_nsamp = len(channels_data[0])
 
-        if self.freq_estimate:
-            # cyc/s * time/window = cyc/window
-            approx_bin = self.freq_estimate * self.segment_time
-            fft_peak = freq_from_autocorr(data, len(data))
-            freq_bin = nearest_sub_harmonic(fft_peak, approx_bin)
+        # Estimated frequency of each audio channel. Units = FFT bins.
+        freq_bins = []
+        for data in channels_data:
+            if self.freq_estimate:
+                # cyc/s * time/window = cyc/window
+                approx_bin = self.freq_estimate * self.segment_time
+                fft_peak = freq_from_autocorr(data, len(data))
+                freq_bin = nearest_sub_harmonic(fft_peak, approx_bin)
+            else:
+                freq_bin = freq_from_autocorr(data, len(data))
+            freq_bins.append(freq_bin)
 
-        else:
-            freq_bin = freq_from_autocorr(data, len(data))
+        avg_freq_bin = np.mean(freq_bins)   # type: float
 
-        result_fft = []
+        # Calculate STFT of each channel.
+        ffts = []
+        for data in channels_data:
+            freq_bin = avg_freq_bin     # TODO stereo uses average or channel freq?
 
-        for harmonic in range(gauss.nyquist_inclusive(self.cfg.nsamp)):
-            # print(harmonic)
-            begin = freq_bin * (harmonic - 0.5)
-            end = freq_bin * (harmonic + 0.5)
-            # print(begin, end)
-            bands = stft[math.ceil(begin):math.ceil(end)]
-            # TODO if bands are uncorrelated, self.power_sum is better
-            amplitude = np.sum(bands)   # type: complex
-            if harmonic > 0:
-                amplitude *= self.transfer(harmonic)
-            result_fft.append(amplitude)
+            stft = self.stft(data)
+            result_fft = []
 
-        wave = self.irfft(result_fft)
+            # Convert STFT to periodic FFT.
+            for harmonic in range(gauss.nyquist_inclusive(self.cfg.nsamp)):
+                begin = freq_bin * (harmonic - 0.5)
+                end = freq_bin * (harmonic + 0.5)
+
+                bands = stft[math.ceil(begin):math.ceil(end)]
+                # if bands are uncorrelated, self.power_sum is better
+                amplitude = self.power_sum(bands)   # type: complex
+                result_fft.append(amplitude)
+
+            ffts.append(result_fft)
+
+        # Find average FFT.
+        avg_fft = self.merger.merge_ffts(ffts, self.transfer)
+
+        # Reassign phases.
+        if self.phase_f:
+            # Don't rephase the DC bin.
+            first_bin = 1
+
+            phases = self.phase_f(np.arange(first_bin, len(avg_fft)))
+            phasors = np.exp(1j * phases)
+
+            avg_fft = np.abs(avg_fft).astype(complex)
+            avg_fft[first_bin:] *= phasors
+
+        # Create periodic wave.
+        wave = self.irfft(avg_fft)
         if self.cfg.range:
             wave, peak = self.rescaler.rescale_peak(wave)
         else:
             peak = 1
 
-        freq_hz = freq_bin / len(data) * self.sr
-
+        freq_hz = avg_freq_bin / stft_nsamp * self.sr
         return wave, freq_hz, peak
 
-    def stft(self, sample_offset):
+    def stft(self, data: np.ndarray) -> np.ndarray:
         """ Phasor phases will match center of data, or peak of window. """
-        data = self.raw_at(sample_offset)
         data *= self.window
         phased_data = np.roll(data, len(data) // 2)
         return fourier.rfft_norm(phased_data)
 
-    def raw_at(self, sample_offset):
+    def data_channels_at(self, sample_offset):
         if sample_offset + self.segment_smp >= len(self.wav):
             sample_offset = len(self.wav) - self.segment_smp
         data = self.wav[sample_offset:sample_offset + self.segment_smp]  # type: np.ndarray
@@ -292,23 +399,23 @@ class WaveReader:
 
 
 if __name__ == '__main__':
-    if 1 < len(sys.argv):
-        main(sys.argv[1])
-    else:
-        message = 'Usage: %s config.n163' % Path(__file__).name + '''
+    main()
 
-config.n163 is a YAML file:
-
-file: "filename.wav"        # quotes are optional
-nsamp: N163 wave length
-pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
-                                # This tool may estimate the wrong octave, if line is missing.
-                                # Exclude if WAV file has pitch changes 1 octave or greater.
-at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
-                                # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
-                                # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
-[optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
-[optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
-[optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
-'''
-        print(message, file=sys.stderr)
+#     # FIXME
+#     message = 'Usage: %s config.n163' % Path(__file__).name + '''
+#
+# config.n163 is a YAML file:
+#
+# file: "filename.wav"        # quotes are optional
+# nsamp: 64
+# pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
+#                             # This tool may estimate the wrong octave, if line is missing.
+#                             # Exclude if WAV file has pitch changes 1 octave or greater.
+# at: "0:15 | 15:30 30:15"    # The program generates synchronized wave and volume envelopes. DO NOT EXCEED 0:64 OR 63:0.
+#                             # 0 1 2 ... 13 14 | 15 16 ... 29 30 29 ... 17 16
+#                             # TODO: 0:30:10 should produce {0 0 0 1 1 1 ... 9 9 9} (30 items), mimicing FamiTracker behavior.
+# [optional] nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
+# [optional] fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
+# [optional] fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+# '''
+#     print(message, file=sys.stderr)

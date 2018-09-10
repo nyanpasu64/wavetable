@@ -1,14 +1,14 @@
 import itertools
 from collections import OrderedDict
-from typing import List, Optional
+from typing import List, Optional, Callable
 
 import numpy as np
-from wavetable import wave_util
-from wavetable.instrument import _get, I, F, S
-from wavetable import fourier
-from wavetable import transfers
-from wavetable.instrument import MergeInstr
-from wavetable.wave_util import Rescaler
+
+from wavetable.dsp import fourier, wave_util, transfers
+from wavetable.dsp.transfers import filter_fft
+from wavetable.dsp.fourier import InputSpectrum, WaveType, SpectrumType
+from wavetable.dsp.wave_util import Rescaler
+from wavetable.types.instrument import MergeInstr, _get, I, F, S
 
 
 # todo, MML belongs in Instrument
@@ -97,7 +97,7 @@ class Merge:
 
     def __init__(self, maxrange: Optional[int], merge_style='POWER', fft='zoh', scaling='local'):
 
-        self.phasor_merger = self.merge_funcs[merge_style]
+        self.phasor_merger = self.merge_funcs[merge_style]  # type: Callable[[List[complex]], complex]
         self.scaling = scaling
 
         if maxrange:
@@ -110,26 +110,12 @@ class Merge:
             self.irfft = fourier.irfft_zoh
         elif fft == 'v1':
             self.rfft = fourier.rfft_norm
-            self.irfft = fourier.irfft_old
+            self.irfft = fourier.irfft_nyquist
         elif fft == 'v0':
             self.rfft = fourier.rfft_norm
             self.irfft = fourier.irfft_norm
         else:
             raise ValueError(f'fft=[zoh, v1, v0] (you supplied {fft})')
-
-    def _merge_waves(self, waves: List[np.ndarray], nsamp, transfer):
-        """ Depends on self.avg_func. """
-        ffts = [self.rfft(wave) for wave in waves]
-
-        outs = []
-        for f, phasors in enumerate(itertools.zip_longest(*ffts, fillvalue=0j)):
-            outs.append(self.phasor_merger(phasors) * transfer(f))
-
-        wave_out = self.irfft(outs, nsamp)
-        if self.scaling == 'local' and self.rescaler:
-            return self.rescaler.rescale(wave_out)
-        else:
-            return wave_out
 
     def merge_instrs(self, instrs: List[MergeInstr], nsamp, transfer=transfers.Unity()):
         """ Pads each MergeInstr to longest. Then merges all and returns new $waves. """
@@ -152,6 +138,33 @@ class Merge:
         else:
             return merged_waves
 
+    def _merge_waves(self, waves: List[WaveType], nsamp, transfer) -> WaveType:
+        """ Depends on self.avg_func. """
+        ffts = [self.rfft(wave) for wave in waves]
+
+        outs = self.merge_ffts(ffts, transfer)
+
+        wave_out = self.irfft(outs, nsamp)
+        if self.scaling == 'local' and self.rescaler:
+            return self.rescaler.rescale(wave_out)
+        else:
+            return wave_out
+
+    def merge_ffts(self, ffts: List[InputSpectrum], transfer) -> SpectrumType:
+        out_fft = []
+
+        # Loop over frequency bins.
+        for freq, phasors in enumerate(itertools.zip_longest(*ffts, fillvalue=0j)):
+            out_fft.append(self.phasor_merger(phasors))
+
+        out_fft = filter_fft(out_fft, transfer)
+        return out_fft
+
+    # unused?
+    def merge_combine(self, instrs: List[MergeInstr], nsamp, transfer=transfers.Unity()):
+        """ merge and combine into minimal wave and MML string. """
+        self.combine(self.merge_instrs(instrs, nsamp, transfer))
+
     @staticmethod
     def combine(waves):
         """ Returns minimal waves, MML string. """
@@ -172,10 +185,6 @@ class Merge:
         print(S(mml))
         print()
         print()
-
-    def merge_combine(self, instrs: List[MergeInstr], nsamp, transfer=transfers.Unity()):
-        """ merge and combine into minimal wave and MML string. """
-        self.combine(self.merge_instrs(instrs, nsamp, transfer))
 
 
 # FIXME maxrange

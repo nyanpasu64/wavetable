@@ -1,4 +1,4 @@
-from wavetable.transfers import *
+from wavetable.dsp.transfers import *
 
 
 def test_unity():

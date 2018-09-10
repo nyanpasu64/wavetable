@@ -1,9 +1,7 @@
 import numpy as np
 import pytest
 
-from wavetable.instrument import Instr
-from wavetable.wave_util import A
-
+from wavetable.types.instrument import Instr
 
 NSAMP = 16
 WAVES = np.array([

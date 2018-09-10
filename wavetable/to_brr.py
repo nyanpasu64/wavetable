@@ -11,7 +11,7 @@ from ruamel.yaml import YAML
 from scipy.io import wavfile
 
 from wavetable.wave_reader import WaveReader, WaveReaderConfig
-from wavetable.wave_util import freq2midi
+from wavetable.dsp.wave_util import freq2midi
 
 
 @dataclass
@@ -44,7 +44,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
                       if cfg_path.suffix == CFG_EXT and cfg_path.is_file())
 
         if not cfgs:
-            raise click.ClickException(f'Wave directory {wav_dir} has no .cfg files')
+            raise click.ClickException(f'Wave directory {wav_dir} has no {CFG_EXT} files')
 
         metadata_list: Dict[str, dict] = {}
 
@@ -65,6 +65,9 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
 
 @dataclass
 class WavetableConfig(WaveReaderConfig):
+    # override default
+    fft_mode: str = 'normal'
+
     no_brr: bool = False
     unlooped_prefix: int = 0        # Controls the loop point of the wave.
     truncate_prefix: bool = True    # Remove unlooped prefix from non-initial samples

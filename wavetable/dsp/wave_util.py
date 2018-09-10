@@ -9,15 +9,8 @@ def A(*args):
     return np.array(args)
 
 
-class AttrDict(dict):
-    def __init__(self, seq=None, **kwargs):
-        if seq is None:
-            seq = {}
-        super(self.__class__, self).__init__(seq, **kwargs)
-        self.__dict__ = self
-
-
 # Phasor merging
+# TODO dsp.py
 
 
 def _power_sum(arr):
@@ -106,11 +99,12 @@ class Rescaler:
     # def __call__(self, ys):
     #     return self.rescale_quantize(ys, ret_tuple)
 
-    def rescale_peak(self, ys: np.ndarray):
+    def rescale_peak(self, ys):
         """
         :param ys: waveform
         :return: (rescaled waveform, peak amplitude)
         """
+        ys = np.asarray(ys)
         max_range = self.max_range
 
         if self.rounding == 'round':
