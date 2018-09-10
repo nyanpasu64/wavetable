@@ -1,5 +1,6 @@
 import math
 from contextlib import redirect_stdout
+from numbers import Number
 from pathlib import Path
 from typing import Tuple, Sequence, Optional, Union, List, Callable
 
@@ -144,6 +145,7 @@ class WaveReaderConfig(ConfigMixin):
     width_ms: float = '1000 / 30'  # Length of each STFT window
     transfer: str = 'transfers.Unity()'
     phase_f: Optional[str] = None
+    phase: Union[str, float] = None
 
     # Output bit depth and rounding
     range: Optional[int] = 16
@@ -364,8 +366,24 @@ class WaveReader:
             self.files.append(file)
 
         self.transfer = eval(cfg.transfer)
+
+        # TODO switch from dataclasses to attrs, implement these as converters
         if cfg.phase_f:
             self.phase_f = eval(cfg.phase_f)
+
+        # converter should use functools.singledispatch
+        elif cfg.phase is not None:
+            # We want to handle both numbers and expressions.
+            if isinstance(cfg.phase, Number):
+                phase = cfg.phase
+            else:
+                phase = eval(cfg.phase, {
+                    **globals(),
+                    'pi': np.pi,
+                    'saw': -np.pi / 2
+                })
+            self.phase_f = lambda f: phase
+
         else:
             self.phase_f = None
 
