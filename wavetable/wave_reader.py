@@ -215,6 +215,7 @@ def parse_pitch(pitch: Optional[float], wav_path: str, why: str) -> float:
 class FileConfig(ConfigMixin):
     path: str
     pitch_estimate: float = None
+    strict_pitch: bool = False
 
     volume: float = 1.0
     speed: int = 1
@@ -322,6 +323,8 @@ class File:
         """ Return estimated frequency of data. Units = STFT bins."""
         # cyc/window = cyc/s * s/window
         approx_bin = self.fundamental_freq * self.segment_time
+        if self.cfg.strict_pitch:
+            return approx_bin
 
         try:
             fft_peak = freq_from_autocorr(data, len(data))
