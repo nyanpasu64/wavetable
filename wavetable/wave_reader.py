@@ -70,7 +70,7 @@ def process_cfg(cfg_path: Path, dest_dir: Path):
     cfg_dir = cfg_path.parent
 
     file_cfg = recursive_load_yaml(cfg_path)
-    cfg = WaveReaderConfig.new(**file_cfg)
+    cfg = WaveReaderConfig.new(file_cfg)
 
     # dest
     dest_path = dest_dir / (cfg_path.name + '.txt')
@@ -144,7 +144,7 @@ class WaveReaderConfig(ConfigMixin):
         if wav_path is not None:
             self.files = [FileConfig(wav_path, self.root_pitch)]
         else:
-            self.files = [FileConfig(**file_info) for file_info in self.files]
+            self.files = [FileConfig.new(file_info) for file_info in self.files]
 
         self.width_ms = safe_eval(str(self.width_ms))
         self.sweep = parse_sweep(self.sweep)
@@ -182,15 +182,15 @@ def parse_sweep(at: str) -> list:
 def unrounded_cfg(**kwargs):
     kwargs.setdefault('range', None)
     kwargs.setdefault('vol_range', None)
-    return WaveReaderConfig.new(**kwargs)
+    return WaveReaderConfig.new(kwargs)
 
 
 def n163_cfg(**kwargs):
-    return WaveReaderConfig.new(**kwargs)
+    return WaveReaderConfig.new(kwargs)
 
 
 @dataclass
-class FileConfig:
+class FileConfig(ConfigMixin):
     path: str
     pitch_estimate: int
 

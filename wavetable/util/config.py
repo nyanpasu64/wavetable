@@ -1,12 +1,33 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Union
 
 
 @dataclass
 class ConfigMixin:
     @classmethod
-    def new(cls, **state):
+    def new(cls, state):
         """ Redirect `Alias(key)=value` to `key=value`.
         Then call the dataclass constructor (to validate parameters). """
+
+        # @dataclass
+        # class Main(ConfigMixin):
+        #     foo: int
+        #     sub: Union[int, 'Sub']
+        #
+        #     def __post_init__(self):
+        #         self.sub = Sub.new(self.sub)
+        #
+        # @dataclass
+        # class Sub(ConfigMixin):
+        #     bar: int
+        #
+        # obj = Main(foo=1, sub={'bar': 2})
+        # replace(obj, foo=1)
+
+        # sub is both an InitVar and a regular variable.
+
+        if isinstance(state, cls):
+            return state
 
         for key, value in dict(state).items():
             class_var = getattr(cls, key, None)
