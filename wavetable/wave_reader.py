@@ -474,7 +474,8 @@ class WaveReader:
         for file in self.files:
             for fft, freq in file.get_ffts_freqs(time):
                 ffts.append(fft)
-                freqs.append(freq)
+                # fundamental frequency, not multiplied frequency
+                freqs.append(freq / file.freq_mul)
                 del fft, freq
 
         # Find average FFT.
