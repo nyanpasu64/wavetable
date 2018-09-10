@@ -85,7 +85,6 @@ def process_cfg(cfg_path: Path, dest_dir: Path):
             instr.print(note)
 
 
-
 def recursive_load_yaml(cfg_path, parents=None):
     if parents is None:
         parents = []
@@ -258,7 +257,7 @@ class File:
         self.fundamental_freq *= speed_shift
 
         # Zero-space the periodic FFT to create a harmonic.
-        self.pitch_mul = cfg.speed * cfg.repitch
+        self.freq_mul = cfg.speed * cfg.repitch
 
         # Compute segment size and window
         segment_smp = self.smp_time(wcfg.width_ms / 1000)
@@ -285,7 +284,7 @@ class File:
     def _get_periodic_fft_freq(self, data) -> Tuple[SpectrumType, float]:
         """ Returns periodic FFT and frequency (Hz) of data. """
         nsamp = self.wcfg.nsamp
-        pitch_mul = self.pitch_mul
+        freq_mul = self.freq_mul
 
         # Get STFT.
         stft = self._stft(data)
@@ -294,7 +293,7 @@ class File:
         fundamental_bin = self._get_fundamental_bin(data)
         periodic_fft = []
 
-        for harmonic in range(rfft_length(nsamp, pitch_mul)):
+        for harmonic in range(rfft_length(nsamp, freq_mul)):
             begin = fundamental_bin * (harmonic - 0.5)
             end = fundamental_bin * (harmonic + 0.5)
 
@@ -303,15 +302,15 @@ class File:
             periodic_fft.append(amplitude)
 
         # Multiply pitch of FFT.
-        pitch_mul_fft = zero_pad(periodic_fft, pitch_mul)
+        freq_mul_fft = zero_pad(periodic_fft, freq_mul)
 
         # Ensure we didn't omit any harmonics <= Nyquist.
-        fft_plus_harmonic_length = len(pitch_mul_fft) + pitch_mul
+        fft_plus_harmonic_length = len(freq_mul_fft) + freq_mul
         assert fft_plus_harmonic_length > rfft_length(nsamp)
 
         # cyc/s = cyc/bin * bin/samp * samp/s
         freq_hz = fundamental_bin / len(data) * self.smp_s
-        return pitch_mul_fft, freq_hz
+        return freq_mul_fft, freq_hz
 
     def _stft(self, data: np.ndarray) -> np.ndarray:
         """ Phasor phases will match center of data, or peak of window. """
