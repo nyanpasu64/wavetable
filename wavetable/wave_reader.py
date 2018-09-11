@@ -460,12 +460,13 @@ class WaveReader:
             waves.append(wave)
             freqs.append(freq)
             vols.append(peak)
+        del peak
 
         waves = wave_util.align_waves(waves)
-        peak = None
+        global_peak = None
         if self.cfg.vol_range:
-            vols, peak = self.vol_rescaler.rescale_peak(vols)
-        return Instr(waves, freqs=freqs, vols=vols, peak=peak)
+            vols, global_peak = self.vol_rescaler.rescale_peak(vols)
+        return Instr(waves, freqs=freqs, vols=vols, peak=global_peak)
 
     def _wave_at(self, frame: int) -> Tuple[np.ndarray, float, float]:
         """ Pure function, no side effects.
@@ -510,7 +511,7 @@ class WaveReader:
         if self.cfg.range:
             wave, peak = self.rescaler.rescale_peak(wave)
         else:
-            peak = 1
+            peak = 1.0
 
         return wave, avg_freq_hz, peak
 
