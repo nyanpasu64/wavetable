@@ -120,6 +120,8 @@ class Instr:
     vols: SeqType = None
     freqs: SeqType = None
 
+    peak: float = None
+
     SEQS: ClassVar = ['sweep', 'vols', 'freqs']
 
     @property
@@ -192,6 +194,7 @@ class Instr:
         self.sweep[:] = used2out
 
     def print(self, *args):
+        # TODO test this function
         self.print_waves()
 
         if self.vols is not None:
@@ -202,18 +205,22 @@ class Instr:
         if self.freqs is not None:
             self.print_freqs(*args)
 
+        wave_inds = self.sweep
+        print('wave_inds:')
+        print(S(wave_inds))
+        print()
+
+        if self.peak is not None:
+            print(f'peak = {self.peak}')
+
     def print_waves(self):
         strs = [S(wave) for wave in self.waves]
         print(';\n'.join(strs))
         print()
 
-        wave_inds = self.sweep
-        print(S(wave_inds))
-        print()
-
     def print_freqs(self, note, tranpose_factor=1):
-        pitch = [freq2pitch(freq * tranpose_factor, note) for freq in self.freqs]
-        print('pitch')
+        pitch = freq2pitch(self.freqs * tranpose_factor, note)
+        print('pitch:')
         print(S(pitch))
         print()
 

@@ -4,7 +4,7 @@ import numpy as np
 
 from wavetable.dsp import fourier
 from wavetable.dsp.fourier import InputSpectrum, WaveType, SpectrumType
-from wavetable.types.instrument import Instr
+from wavetable.instrument import Instr
 from wavetable.util.reprmixin import ReprMixin
 
 

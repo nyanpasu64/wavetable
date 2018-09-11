@@ -15,7 +15,7 @@ from wavetable.dsp.fourier import rfft_length, zero_pad, SpectrumType
 from wavetable.dsp.wave_util import Rescaler
 from wavetable.inputs.wave import load_wave
 from wavetable.merge import Merge
-from wavetable.types.instrument import Instr, LOOP, RELEASE
+from wavetable.instrument import Instr, LOOP, RELEASE
 from wavetable.util.config import Alias, ConfigMixin
 from wavetable.util.math import nearest_sub_harmonic, midi2ratio, midi2freq
 from wavetable.util.parsing import safe_eval
@@ -85,7 +85,6 @@ def process_cfg(cfg_path: Path, dest_dir: Path):
             instr.print(note)
 
 
-
 def recursive_load_yaml(cfg_path, parents=None):
     if parents is None:
         parents = []
@@ -124,7 +123,11 @@ class WaveReaderConfig(ConfigMixin):
     nsamp: int
     root_pitch: float = None
     pitch_estimate = Alias('root_pitch')
+    strict_pitch: bool = False
+
     wav_path: InitVar[str] = None
+    path = Alias('wav_path')
+    file = Alias('wav_path')
     files: List[Union[dict, 'FileConfig']] = None
 
     # Frame rate and subsampling
@@ -157,6 +160,12 @@ class WaveReaderConfig(ConfigMixin):
             self.files = [FileConfig(wav_path, self.root_pitch)]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
+            if self.root_pitch is None:
+                if len(self.files) == 1:
+                    self.root_pitch = self.files[0].pitch_estimate
+                else:
+                    raise TypeError(
+                        'must specify root_pitch when providing multiple files')
 
         self.width_ms = safe_eval(str(self.width_ms))
         self.sweep = parse_sweep(self.sweep)
@@ -258,7 +267,7 @@ class File:
         self.fundamental_freq *= speed_shift
 
         # Zero-space the periodic FFT to create a harmonic.
-        self.pitch_mul = cfg.speed * cfg.repitch
+        self.freq_mul = cfg.speed * cfg.repitch
 
         # Compute segment size and window
         segment_smp = self.smp_time(wcfg.width_ms / 1000)
@@ -285,7 +294,7 @@ class File:
     def _get_periodic_fft_freq(self, data) -> Tuple[SpectrumType, float]:
         """ Returns periodic FFT and frequency (Hz) of data. """
         nsamp = self.wcfg.nsamp
-        pitch_mul = self.pitch_mul
+        freq_mul = self.freq_mul
 
         # Get STFT.
         stft = self._stft(data)
@@ -294,7 +303,7 @@ class File:
         fundamental_bin = self._get_fundamental_bin(data)
         periodic_fft = []
 
-        for harmonic in range(rfft_length(nsamp, pitch_mul)):
+        for harmonic in range(rfft_length(nsamp, freq_mul)):
             begin = fundamental_bin * (harmonic - 0.5)
             end = fundamental_bin * (harmonic + 0.5)
 
@@ -303,15 +312,15 @@ class File:
             periodic_fft.append(amplitude)
 
         # Multiply pitch of FFT.
-        pitch_mul_fft = zero_pad(periodic_fft, pitch_mul)
+        freq_mul_fft = zero_pad(periodic_fft, freq_mul)
 
         # Ensure we didn't omit any harmonics <= Nyquist.
-        fft_plus_harmonic_length = len(pitch_mul_fft) + pitch_mul
+        fft_plus_harmonic_length = len(freq_mul_fft) + freq_mul
         assert fft_plus_harmonic_length > rfft_length(nsamp)
 
         # cyc/s = cyc/bin * bin/samp * samp/s
         freq_hz = fundamental_bin / len(data) * self.smp_s
-        return pitch_mul_fft, freq_hz
+        return freq_mul_fft, freq_hz
 
     def _stft(self, data: np.ndarray) -> np.ndarray:
         """ Phasor phases will match center of data, or peak of window. """
@@ -323,6 +332,8 @@ class File:
         """ Return estimated frequency of data. Units = STFT bins."""
         # cyc/window = cyc/s * s/window
         approx_bin = self.fundamental_freq * self.segment_time
+        if self.wcfg.strict_pitch:
+            return approx_bin
 
         try:
             fft_peak = freq_from_autocorr(data, len(data))
@@ -449,12 +460,13 @@ class WaveReader:
             waves.append(wave)
             freqs.append(freq)
             vols.append(peak)
+        del peak
 
         waves = wave_util.align_waves(waves)
+        global_peak = None
         if self.cfg.vol_range:
-            vols, peak = self.vol_rescaler.rescale_peak(vols)
-            print(f'peak = {peak}')
-        return Instr(waves, freqs=freqs, vols=vols)
+            vols, global_peak = self.vol_rescaler.rescale_peak(vols)
+        return Instr(waves, freqs=freqs, vols=vols, peak=global_peak)
 
     def _wave_at(self, frame: int) -> Tuple[np.ndarray, float, float]:
         """ Pure function, no side effects.
@@ -475,7 +487,8 @@ class WaveReader:
         for file in self.files:
             for fft, freq in file.get_ffts_freqs(time):
                 ffts.append(fft)
-                freqs.append(freq)
+                # fundamental frequency, not multiplied frequency
+                freqs.append(freq / file.freq_mul)
                 del fft, freq
 
         # Find average FFT.
@@ -498,7 +511,7 @@ class WaveReader:
         if self.cfg.range:
             wave, peak = self.rescaler.rescale_peak(wave)
         else:
-            peak = 1
+            peak = 1.0
 
         return wave, avg_freq_hz, peak
 
