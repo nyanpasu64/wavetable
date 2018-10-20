@@ -387,15 +387,17 @@ class WaveReader:
         # converter should use functools.singledispatch
         elif cfg.phase is not None:
             # We want to handle both numbers and expressions.
-            if isinstance(cfg.phase, Number):
+            if isinstance(cfg.phase, str):
                 phase = cfg.phase
             else:
-                phase = eval(cfg.phase, {
-                    **globals(),
-                    'pi': np.pi,
-                    'saw': -np.pi / 2
-                })
-            self.phase_f = lambda f: phase
+                phase = repr(cfg.phase)
+
+            self.phase_f = lambda f: eval(phase, {
+                **globals(),
+                'f': f,
+                'pi': np.pi,
+                'saw': -np.pi / 2
+            })
 
         else:
             self.phase_f = None
