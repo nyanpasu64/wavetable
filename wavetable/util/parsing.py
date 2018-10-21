@@ -40,5 +40,8 @@ def _safe_eval(node, variables, functions):
 # literal_eval(repr(1+2j)) == 1+2j
 
 def safe_eval(expr, variables={}, functions={}):
+    if not isinstance(expr, str):
+        return expr
+
     node = ast.parse(expr, '<string>', 'eval').body
     return _safe_eval(node, variables, functions)

@@ -209,7 +209,7 @@ def parse_pitch(pitch: Optional[float], wav_path: str, why: str) -> float:
     - strings.69.5.wav -> 69.5
     """
     if pitch is not None:
-        return pitch
+        return safe_eval(pitch)
 
     wav_no_ext = Path(wav_path).stem
     if '.' not in wav_no_ext:
