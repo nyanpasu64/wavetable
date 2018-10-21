@@ -145,6 +145,7 @@ class WaveReaderConfig(ConfigMixin):
     sweep: Union[str, list] = ''        # FTI playback indices. Unused waves will be removed.
 
     # STFT configuration
+    mode: InitVar[str] = 'stft'  # File.get_ffts_freqs
     fft_mode: str = 'zoh'
     stft_merge: str = 'power'
     width_ms: float = '1000 / 30'  # Length of each STFT window
@@ -156,10 +157,10 @@ class WaveReaderConfig(ConfigMixin):
     range: Optional[int] = 16
     vol_range: Optional[int] = 16
 
-    def __post_init__(self, wav_path):
+    def __post_init__(self, wav_path, mode):
         if wav_path is not None:
             self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
-            self.files = [FileConfig(wav_path, self.root_pitch)]
+            self.files = [FileConfig(wav_path, self.root_pitch, mode=mode)]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
             if self.root_pitch is None:
@@ -225,12 +226,14 @@ def parse_pitch(pitch: Optional[float], wav_path: str, why: str) -> float:
 
 @dataclass
 class FileConfig(ConfigMixin):
+    """ A single WAV file. Each WaveReaderConfig can hold multiple FileConfigs. """
     path: str
     pitch_estimate: float = None
 
     volume: float = 1.0
     speed: int = 1
     repitch: int = 1
+    mode: str = 'stft'  # [stft, cycle]
 
     def __post_init__(self):
         self.pitch_estimate = parse_pitch(
@@ -278,7 +281,8 @@ class File:
 
         self.segment_time = self.time_smp(segment_smp)
 
-        self.window = np.hanning(segment_smp)
+        if self.cfg.mode == 'stft':
+            self.window = np.hanning(segment_smp)
 
     def get_ffts_freqs(self, time: float):
         """ Returns one (periodic FFT, frequency Hz)) per channel. """
@@ -295,30 +299,48 @@ class File:
 
     def _get_periodic_fft_freq(self, data) -> Tuple[SpectrumType, float]:
         """ Returns periodic FFT and frequency (Hz) of data. """
+
+        # Number of samples
         nsamp = self.wcfg.nsamp
         freq_mul = self.freq_mul
 
-        # Get STFT.
-        stft = self._stft(data)
+        mode = self.cfg.mode
 
-        # Convert STFT to periodic FFT.
-        fundamental_bin = self._get_fundamental_bin(data)
         periodic_fft = []
+        fundamental_bin: float = self._get_fundamental_bin(data)
 
-        for harmonic in range(rfft_length(nsamp, freq_mul)):
-            begin = fundamental_bin * (harmonic - 0.5)
-            end = fundamental_bin * (harmonic + 0.5)
+        if mode == 'stft':
+            # Get STFT.
+            stft = self._stft(data)
 
-            bands = stft[math.ceil(begin):math.ceil(end)]
-            amplitude: complex = self.power_sum(bands)
-            periodic_fft.append(amplitude)
+            # Convert STFT to periodic FFT.
+            for harmonic in range(rfft_length(nsamp, freq_mul)):
+                begin = fundamental_bin * (harmonic - 0.5)
+                end = fundamental_bin * (harmonic + 0.5)
+
+                bands = stft[math.ceil(begin):math.ceil(end)]
+                amplitude: complex = self.power_sum(bands)
+                periodic_fft.append(amplitude)
+
+        elif mode == 'cycle':
+            period = round(len(data) / fundamental_bin)
+
+            # Pick 1 period of data, from the middle of the region.
+            end = (len(data) + period) // 2
+            begin = end - period
+
+            periodic_fft = fourier.rfft_norm(data[begin:end])
+
+        else:
+            raise ValueError(f'mode=[stft, cycle] (you supplied {mode})')
 
         # Multiply pitch of FFT.
         freq_mul_fft = zero_pad(periodic_fft, freq_mul)
 
         # Ensure we didn't omit any harmonics <= Nyquist.
         fft_plus_harmonic_length = len(freq_mul_fft) + freq_mul
-        assert fft_plus_harmonic_length > rfft_length(nsamp)
+        assert fft_plus_harmonic_length > rfft_length(nsamp), \
+            f'fft len={len(freq_mul_fft)} + {freq_mul} not > {rfft_length(nsamp)}'
 
         # cyc/s = cyc/bin * bin/samp * samp/s
         freq_hz = fundamental_bin / len(data) * self.smp_s
@@ -335,7 +357,7 @@ class File:
         # cyc/window = cyc/s * s/window
         approx_bin = self.fundamental_freq * self.segment_time
         if self.wcfg.strict_pitch:
-            return approx_bin
+            return float(approx_bin)
 
         try:
             fft_peak = freq_from_autocorr(data, len(data))
@@ -344,7 +366,7 @@ class File:
 
         freq_bin = nearest_sub_harmonic(fft_peak, approx_bin)
 
-        return freq_bin
+        return float(freq_bin)
 
     def smp_time(self, time):
         return int(time * self.smp_s)
@@ -402,6 +424,7 @@ class WaveReader:
         else:
             self.phase_f = None
 
+        # STFT mode
         fft_mode = cfg.fft_mode
         if fft_mode == 'normal':
             self.irfft = fourier.irfft_norm
