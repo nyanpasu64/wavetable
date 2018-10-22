@@ -230,6 +230,7 @@ class FileConfig(ConfigMixin):
     path: str
     pitch_estimate: float = None
 
+    channel: int = None
     volume: float = 1.0
     speed: int = 1
     repitch: int = 1
@@ -261,6 +262,8 @@ class File:
 
         # Scale by volume
         self.wav = self.wav.astype(float) * cfg.volume
+        if cfg.channel is not None:
+            self.wav = self.wav[:, [cfg.channel]]
 
         self.fundamental_freq = midi2freq(cfg.pitch_estimate)
 
@@ -398,6 +401,9 @@ class WaveReader:
         self.files = []
         for file_cfg in cfg.files:
             file = File(cfg_dir, file_cfg, cfg, self.power_sum)
+            if file.wav.shape[1] > 1 and not self.cfg.range:
+                print("Warning: Multi-channel wave will be amplified.")
+                print("To prevent this, assign a wave amplitude 'range' or add 'channel=0'.")
             self.files.append(file)
 
         self.transfer = eval(cfg.transfer)
