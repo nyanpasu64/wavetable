@@ -147,7 +147,14 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
         wav_path.parent.mkdir(exist_ok=True)
 
         # Write WAV file
-        wave = np.around(wave).astype(DTYPE)
+        wave = np.around(wave)
+        wave_int = wave.astype(DTYPE)
+        if any(wave_int != wave):
+            # Overflows are not automatically caught.
+            # https://github.com/numpy/numpy/issues/8987
+            raise ValueError('Integer overflow when writing .wav!')
+        wave = wave_int
+
         # Duplicate prefix of wave data
         wave = np.concatenate((wave, wave[:unlooped_prefix]))
         wavfile.write(str(wav_path), SAMPLE_RATE, wave)
