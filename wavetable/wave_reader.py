@@ -341,9 +341,10 @@ class File:
         freq_mul_fft = zero_pad(periodic_fft, freq_mul)
 
         # Ensure we didn't omit any harmonics <= Nyquist.
-        fft_plus_harmonic_length = len(freq_mul_fft) + freq_mul
-        assert fft_plus_harmonic_length > rfft_length(nsamp), \
-            f'fft len={len(freq_mul_fft)} + {freq_mul} not > {rfft_length(nsamp)}'
+        if mode == 'stft':
+            fft_plus_harmonic_length = len(freq_mul_fft) + freq_mul
+            assert fft_plus_harmonic_length > rfft_length(nsamp), \
+                f'fft len={len(freq_mul_fft)} + {freq_mul} not > {rfft_length(nsamp)}'
 
         # cyc/s = cyc/bin * bin/samp * samp/s
         freq_hz = fundamental_bin / len(data) * self.smp_s
