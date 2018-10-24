@@ -172,7 +172,8 @@ class WaveReaderConfig(ConfigMixin):
                     raise TypeError(
                         'must specify root_pitch when providing multiple files')
 
-        self.width_ms = safe_eval(str(self.width_ms))
+        self.width_ms = safe_eval(self.width_ms)
+        self.fps = safe_eval(self.fps)
         self.sweep = parse_sweep(self.sweep)
 
 
