@@ -239,6 +239,7 @@ class FileConfig(ConfigMixin):
     def __post_init__(self):
         self.pitch_estimate = parse_pitch(
             self.pitch_estimate, self.path, 'files[].pitch_estimate')
+        self.volume = safe_eval(self.volume)
 
 
 class File:
