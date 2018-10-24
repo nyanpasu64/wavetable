@@ -65,13 +65,15 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
 
 @dataclass
 class WavetableConfig(WaveReaderConfig):
-    # override default
-    fft_mode: str = 'normal'
-
     no_brr: bool = False
     unlooped_prefix: int = 0        # Controls the loop point of the wave.
     truncate_prefix: bool = True    # Remove unlooped prefix from non-initial samples
     gaussian: bool = True
+
+    # override default
+    fft_mode: str = 'normal'
+    range: Optional[int] = None
+    vol_range: Optional[int] = None
 
 
 @dataclass
@@ -119,9 +121,6 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
 
     # Load config file
     file_cfg: dict = yaml.load(cfg_path)
-    file_cfg.setdefault('range', None)
-    file_cfg.setdefault('vol_range', None)
-
     cfg = WavetableConfig(**file_cfg)
 
     no_brr = cfg.no_brr
