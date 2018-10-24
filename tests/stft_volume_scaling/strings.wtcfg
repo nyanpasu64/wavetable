@@ -1,0 +1,6 @@
+files:
+  - path: str-low.48.wav
+
+fps: 10
+nsamp: 128
+range: ~

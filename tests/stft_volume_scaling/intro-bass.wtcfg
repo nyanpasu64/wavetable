@@ -1,0 +1,10 @@
+files:
+-
+  path: intro-bass.wav
+  channel: 0
+  pitch_estimate: 36+1
+
+
+fps: 2.3
+nsamp: 96
+range: ~

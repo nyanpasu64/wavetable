@@ -1,0 +1,10 @@
+files:
+-
+  path: melodic.wav
+  channel: 0
+  pitch_estimate: 60+8
+
+
+fps: 7.142857142857143
+nsamp: 96
+range: ~

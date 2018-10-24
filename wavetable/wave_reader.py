@@ -247,6 +247,10 @@ class File:
     segment_time: float = None
     window: np.ndarray = None
 
+    # The approximate ratio of output/input amplitude (in the absence of compensation).
+    # See "tests/stft_volume_scaling/analyze_stft_volume.py" for details.
+    VOLUME_RATIO = 0.585
+
     def __init__(self,
                  cfg_dir: Path,
                  cfg: FileConfig,
@@ -286,7 +290,9 @@ class File:
         self.segment_time = self.time_smp(segment_smp)
 
         if self.cfg.mode == 'stft':
-            self.window = np.hanning(segment_smp)
+            # For BRR encoding, ensure the output amplitude is approximately unity-gain,
+            # by dividing by estimated attenuation factor.
+            self.window = np.hanning(segment_smp) / self.VOLUME_RATIO
 
     def get_ffts_freqs(self, time: float):
         """ Returns one (periodic FFT, frequency Hz)) per channel. """

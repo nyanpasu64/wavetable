@@ -1,0 +1,8 @@
+files:
+-
+  path: square.wav
+  pitch_estimate: 69
+
+fps: 3.14
+nsamp: 128
+range: ~

@@ -1,0 +1,9 @@
+files:
+-
+  path: chunky.wav
+  channel: 0
+  pitch_estimate: 36+5
+
+fps: 8.43212237093690248566
+nsamp: 256
+range: ~
