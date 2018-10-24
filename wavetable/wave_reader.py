@@ -1,11 +1,10 @@
 import math
+import warnings
 from contextlib import redirect_stdout
-from numbers import Number
 from pathlib import Path
 from typing import Tuple, Sequence, Optional, Union, List, Callable
 
 import click
-import numpy as np
 from dataclasses import dataclass, InitVar
 from ruamel.yaml import YAML
 from waveform_analysis.freq_estimation import freq_from_autocorr
@@ -14,11 +13,14 @@ from wavetable.dsp import fourier, wave_util, transfers
 from wavetable.dsp.fourier import rfft_length, zero_pad, SpectrumType
 from wavetable.dsp.wave_util import Rescaler
 from wavetable.inputs.wave import load_wave
-from wavetable.merge import Merge
 from wavetable.instrument import Instr, LOOP, RELEASE
+from wavetable.merge import Merge
 from wavetable.util.config import Alias, ConfigMixin
 from wavetable.util.math import nearest_sub_harmonic, midi2ratio, midi2freq
 from wavetable.util.parsing import safe_eval
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
+import numpy as np
 
 assert transfers  # module used by cfg.transfer
 # https://hackernoon.com/log-x-vs-ln-x-the-curse-of-scientific-computing-170c8e95310c
