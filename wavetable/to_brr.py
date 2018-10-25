@@ -138,7 +138,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
     wr = WaveReader(cfg_path.parent, cfg)
     instr = wr.read()
     ntick = wr.ntick
-    print(f'{cfg_name}: ntick={ntick}')
+    print(f'    {cfg_name}: ntick={ntick}')
 
     for i, wave in enumerate(instr.waves):
         wave_name = f'{cfg_name}-{i:03}'
