@@ -84,6 +84,7 @@ class WavetableMetadata:
     wave_sub: int   # Each wave is repeated `wave_sub` times.
     env_sub: int    # Each volume/frequency entry is repeated `env_sub` times.
 
+    root_pitch: int
     pitches: List[float]
 
 
@@ -182,6 +183,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
         fps=cfg.fps,
         wave_sub=cfg.wave_sub,
         env_sub=cfg.env_sub,
+        root_pitch=cfg.root_pitch,
         pitches=pitches,
     )
 
