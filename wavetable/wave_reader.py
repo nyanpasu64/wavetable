@@ -151,6 +151,7 @@ class WaveReaderConfig(ConfigMixin):
     fft_mode: str = 'zoh'
     stft_merge: str = 'power'
     width_ms: float = '1000 / 30'  # Length of each STFT window
+    width_s: float = None
     transfer: str = 'transfers.Unity()'
     phase_f: Optional[str] = None
     phase: Union[str, float] = None
@@ -172,7 +173,11 @@ class WaveReaderConfig(ConfigMixin):
                     raise TypeError(
                         'must specify root_pitch when providing multiple files')
 
-        self.width_ms = safe_eval(self.width_ms)
+        if self.width_s is not None:
+            self.width_s = safe_eval(self.width_s)
+            self.width_ms = 1000 * self.width_s
+        else:
+            self.width_ms = safe_eval(self.width_ms)
         self.fps = safe_eval(self.fps)
         self.sweep = parse_sweep(self.sweep)
 
@@ -288,6 +293,8 @@ class File:
         # Compute segment size and window
         segment_smp = self.smp_time(wcfg.width_ms / 1000)
         segment_smp = 2 ** math.ceil(np.log2(segment_smp))  # type: int
+        if segment_smp == 0:
+            raise ValueError('invalid width_ms/s, segment_smp == 0')
         self.segment_smp = segment_smp
 
         self.segment_time = self.time_smp(segment_smp)
