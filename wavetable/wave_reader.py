@@ -162,6 +162,8 @@ class WaveReaderConfig(ConfigMixin):
 
     def __post_init__(self, wav_path, mode):
         if wav_path is not None:
+            if self.files is not None:
+                raise ValueError('Config: cannot provide both wav_path and files[]')
             self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
             self.files = [FileConfig(wav_path, self.root_pitch, mode=mode)]
         else:
