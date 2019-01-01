@@ -63,7 +63,8 @@ def irfft_zoh(spectrum: InputSpectrum, nsamp=None) -> WaveType:
     nyquist = NYQUIST(nsamp)
     real = nyquist_real_idx(nsamp)
 
-    spectrum[:nyquist] /= _zoh_transfer(nsamp)
+    head = min(nyquist, len(spectrum))
+    spectrum[:head] /= _zoh_transfer(nsamp)[:head]
     spectrum[real:] = _realify(spectrum[real:])
 
     return irfft_norm(spectrum, nsamp)
