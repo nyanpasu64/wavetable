@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from wavetable.to_brr import process_cfg, ExtractorConfig, \
+from wavetable.to_brr import process_cfg, ExtractorCLI, \
     WAV_SUBDIR, yaml
 from wavetable.util.fs import pushd
 
@@ -26,18 +26,18 @@ unlooped_prefix: 16
 def test_wav_brr():
     """ process_cfg():
     Reads cfg_path. Writes intermediate wav files to cfg_path/WAV_SUBDIR,
-    and writes brr files to global_cfg.dest_dir.
+    and writes brr files to global_cli.dest_dir.
     """
 
     with pushd('tests/test_waves'):
-        global_cfg = ExtractorConfig(dest_dir=Path('dest'))
+        global_cli = ExtractorCLI(dest_dir=Path('dest'))
 
         name = '19'
         cfg_dir = Path()
         cfg_path = (cfg_dir / name).with_suffix('.wtcfg')
 
         wav_dir = cfg_dir / WAV_SUBDIR
-        brr_dir = global_cfg.dest_dir
+        brr_dir = global_cli.dest_dir
 
         brr_dir.mkdir(exist_ok=True)
         del cfg_dir
@@ -52,12 +52,12 @@ def test_wav_brr():
         for nwave in [2, 1]:
             yaml.dump(get_cfg_dict(nwave), cfg_path)
 
-            process_cfg(global_cfg, cfg_path)
+            process_cfg(global_cli, cfg_path)
 
             # Intermediate wav files in `cfg_dir/WAV_SUBDIR/cfg-012.wav`
             assert_count(wav_dir, '.wav')
 
-            # brr files in `global_cfg.dest_dir/cfg-012.brr`.
+            # brr files in `global_cli.dest_dir/cfg-012.brr`.
             assert_count(brr_dir, '.brr')
 
 

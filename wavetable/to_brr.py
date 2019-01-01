@@ -15,7 +15,7 @@ from wavetable.util.math import freq2midi
 
 
 @dataclass
-class ExtractorConfig:
+class ExtractorCLI:
     dest_dir: Path  # If using with wav2brr, it should end in '/~brr/'
 
 
@@ -35,7 +35,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
     WAV_DIRS: Contains .wtcfg and .wav files with the same name.
     DEST_DIR: Location where .brr files are written."""
 
-    global_cfg = ExtractorConfig(dest_dir=Path(dest_dir))
+    global_cli = ExtractorCLI(dest_dir=Path(dest_dir))
     for wav_dir in wav_dirs:
         wav_dir = Path(wav_dir)
         print(wav_dir)
@@ -56,7 +56,7 @@ def main(wav_dirs: Sequence[str], dest_dir: str):
         for cfg_path in cfgs:
             print(cfg_path)
             cfg_name = cfg_path.stem
-            metadata = process_cfg(global_cfg, cfg_path)
+            metadata = process_cfg(global_cli, cfg_path)
             metadata_list[cfg_name] = asdict(metadata)
 
         # Wavetable metadata file
@@ -93,7 +93,7 @@ SAMPLE_RATE = 32000     # Doesn't actually matter for output BRR files.
 WAV_SUBDIR = 'temp-wav'
 
 
-def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadata:
+def process_cfg(global_cli: ExtractorCLI, cfg_path: Path) -> WavetableMetadata:
     """
     Reads cfg_path.
     Writes intermediate wav files to `cfg_dir/WAV_SUBDIR/cfg-012.wav`.
@@ -110,7 +110,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
 
     cfg_dir = cfg_path.parent   # type: Path
     wav_dir = cfg_dir / WAV_SUBDIR
-    brr_dir = global_cfg.dest_dir
+    brr_dir = global_cli.dest_dir
 
     wav_dir.mkdir(exist_ok=True)
 
@@ -129,7 +129,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
     truncate_prefix = cfg.truncate_prefix
     gaussian = cfg.gaussian
 
-    brr_cfg = BrrEncoderConfig(
+    brr_arg = BrrEncoderArgs(
         gaussian=gaussian,
         loop=unlooped_prefix,
     )
@@ -164,7 +164,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
 
         # Encode BRR file
         brr_path = (brr_dir / wave_name).with_suffix('.brr')
-        brr = BrrEncoder(brr_cfg, wav_path, brr_path)
+        brr = BrrEncoder(brr_arg, wav_path, brr_path)
 
         # The first sample's "prefix" is used. When we switch loop points to subsequent
         # samples, only their looped portions are used.
@@ -189,7 +189,7 @@ def process_cfg(global_cfg: ExtractorConfig, cfg_path: Path) -> WavetableMetadat
 
 
 @dataclass
-class BrrEncoderConfig:
+class BrrEncoderArgs:
     loop: Optional[int] = None
     truncate: Optional[int] = None
 
@@ -215,8 +215,8 @@ class BrrEncoder:
     # Do not remove the trailing ellipses. That will hide bugs where the resampling
     # ratio is not extracted correctly (eg. truncated at the decimal point).
 
-    def __init__(self, cfg: BrrEncoderConfig, wav_path: Path, brr_path: Path):
-        self.cfg = cfg
+    def __init__(self, arg: BrrEncoderArgs, wav_path: Path, brr_path: Path):
+        self.arg = arg
         self.wav_path = wav_path
         self.brr_path = brr_path
 
@@ -238,7 +238,7 @@ class BrrEncoder:
         output = result.stdout      # type: str
 
         # Parse output: loop points
-        if self.cfg.loop is not None:
+        if self.arg.loop is not None:
             loop_idx = int(search(self._LOOP_REGEX, output))
         else:
             loop_idx = 0
@@ -264,7 +264,7 @@ class BrrEncoder:
         return wav2brr_ratio
 
     def _get_args(self):
-        cfg = self.cfg
+        cfg = self.arg
         args = [self._CMD]
 
         if cfg.gaussian:
