@@ -45,10 +45,10 @@ Seamless looping is not supported yet, but bidirectional looping using "at" work
 
 ### Output Format
 
-j0CC-Famitracker is available at <https://github.com/nyanpasu64/j0CC-FamiTracker/releases>.
+Dn-Famitracker is available at <https://github.com/Dn-Programming-Core-Management/Dn-FamiTracker/releases>.
 
 ```text
-Ripped Waves (copy to clipboard, click Paste button in j0CC-Famitracker instrument editor):
+Ripped Waves (copy to clipboard, click Paste button in Dn-Famitracker instrument editor):
 0 0 0 2 4 7 9 10 11 12 14 15 15 14 12 12 13 13 12 8 5 4 5 6 7 7 7 7 5 4 2 1; ...
 1 0 0 1 3 6 9 11 13 13 14 15 15 15 14 14 15 14 12 9 6 5 6 6 6 5 4 5 5 5 4 3
 
