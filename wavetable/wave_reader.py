@@ -7,6 +7,9 @@ from typing import Tuple, Sequence, Optional, Union, List, Callable
 import click
 from dataclasses import dataclass, InitVar
 from ruamel.yaml import YAML
+
+import scipy.signal.windows
+scipy.signal.kaiser = scipy.signal.windows.kaiser
 from waveform_analysis.freq_estimation import freq_from_autocorr
 
 from wavetable.dsp import fourier, wave_util, transfers
