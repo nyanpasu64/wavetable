@@ -1,4 +1,5 @@
 import math
+import sys
 import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -158,6 +159,7 @@ class WaveReaderConfig(ConfigMixin):
     transfer: str = 'transfers.Unity()'
     phase_f: Optional[str] = None
     phase: Union[str, float] = None
+    early: float = 0.
 
     # Output bit depth and rounding
     range: Optional[int] = 16
@@ -315,15 +317,24 @@ class File:
         return [self._get_periodic_fft_freq(data) for data in self._channel_data_at(time)]
 
     def _channel_data_at(self, time: float):
-        sample_offset = self.smp_time(time)
+        sample_offset = self.smp_time(time) - int(self.segment_smp * self.wcfg.early)
 
         if sample_offset + self.segment_smp >= len(self.wav):
             sample_offset = len(self.wav) - self.segment_smp
-        data_channel = self.wav[sample_offset : sample_offset + self.segment_smp]  # type: np.ndarray
-        return data_channel.T.copy()
+
+        # [frame][chan] f32
+        interleaved = self.wav[max(0, sample_offset) : sample_offset + self.segment_smp]  # type: np.ndarray
+
+        # [chan][frame] f32
+        planar = interleaved.T.copy()
+        out = np.zeros((len(planar), self.segment_smp))
+        # print(self.segment_smp / len(interleaved), file=sys.stderr)
+        out[:, -len(interleaved):] = planar # * self.segment_smp / len(interleaved)
+        return out
 
     def _get_periodic_fft_freq(self, data) -> Tuple[SpectrumType, float]:
         """ Returns periodic FFT and frequency (Hz) of data. """
+        # print(data.shape, file=sys.stderr)
 
         # Number of samples
         nsamp = self.wcfg.nsamp
