@@ -4,6 +4,7 @@ import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Tuple, Sequence, Optional, Union, List, Callable
+from enum import Enum
 
 import click
 from dataclasses import dataclass, InitVar
@@ -170,7 +171,7 @@ class WaveReaderConfig(ConfigMixin):
             if self.files is not None:
                 raise ValueError('Config: cannot provide both wav_path and files[]')
             self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
-            self.files = [FileConfig(wav_path, self.root_pitch, mode=mode)]
+            self.files = [FileConfig(wav_path, self.root_pitch, mode=WaveMode[mode])]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
             if self.root_pitch is None:
@@ -239,6 +240,11 @@ def parse_pitch(pitch: Optional[float], wav_path: str, why: str) -> float:
     return pitch
 
 
+class WaveMode(Enum):
+    Stft = 'stft'
+    Cycle = 'cycle'
+
+
 @dataclass
 class FileConfig(ConfigMixin):
     """ A single WAV file. Each WaveReaderConfig can hold multiple FileConfigs. """
@@ -249,7 +255,7 @@ class FileConfig(ConfigMixin):
     volume: float = 1.0
     speed: int = 1
     repitch: int = 1
-    mode: str = 'stft'  # [stft, cycle]
+    mode: WaveMode = WaveMode.Stft
 
     def __post_init__(self):
         self.pitch_estimate = parse_pitch(
@@ -306,7 +312,7 @@ class File:
 
         self.segment_time = self.time_smp(segment_smp)
 
-        if self.cfg.mode == 'stft':
+        if self.cfg.mode is WaveMode.Stft:
             # For BRR encoding, ensure the output amplitude is approximately unity-gain,
             # by dividing by estimated attenuation factor.
             self.window = np.hanning(segment_smp) / self.VOLUME_RATIO
@@ -345,7 +351,7 @@ class File:
         periodic_fft = []
         fundamental_bin: float = self._get_fundamental_bin(data)
 
-        if mode == 'stft':
+        if mode is WaveMode.Stft:
             # Get STFT.
             stft = self._stft(data)
 
@@ -358,7 +364,7 @@ class File:
                 amplitude: complex = self.power_sum(bands)
                 periodic_fft.append(amplitude)
 
-        elif mode == 'cycle':
+        elif mode is WaveMode.Cycle:
             period = round(len(data) / fundamental_bin)
 
             # Pick 1 period of data, from the middle of the region.
@@ -374,7 +380,7 @@ class File:
         freq_mul_fft = zero_pad(periodic_fft, freq_mul)
 
         # Ensure we didn't omit any harmonics <= Nyquist.
-        if mode == 'stft':
+        if mode is WaveMode.Stft:
             fft_plus_harmonic_length = len(freq_mul_fft) + freq_mul
             assert fft_plus_harmonic_length > rfft_length(nsamp), \
                 f'fft len={len(freq_mul_fft)} + {freq_mul} not > {rfft_length(nsamp)}'
