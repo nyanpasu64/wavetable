@@ -117,7 +117,7 @@ def irfft_norm(spectrum: InputSpectrum, nsamp=None, *args, **kwargs) -> WaveType
 # Utility
 
 
-def zero_pad(spectrum: InputSpectrum, harmonic) -> WaveType:
+def zero_space(spectrum: InputSpectrum, harmonic) -> WaveType:
     """ Zero-pad a spectrum to create a harmonic. Doesn't add trailing zeros. """
     nyquist = len(spectrum) - 1
     padded = np.zeros(nyquist * harmonic + 1, dtype=complex)

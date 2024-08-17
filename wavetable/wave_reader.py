@@ -15,7 +15,7 @@ scipy.signal.kaiser = scipy.signal.windows.kaiser
 from waveform_analysis.freq_estimation import freq_from_autocorr
 
 from wavetable.dsp import fourier, wave_util, transfers
-from wavetable.dsp.fourier import rfft_length, zero_pad, SpectrumType
+from wavetable.dsp.fourier import rfft_length, zero_space, SpectrumType
 from wavetable.dsp.wave_util import Rescaler
 from wavetable.inputs.wave import load_wave
 from wavetable.instrument import Instr, LOOP, RELEASE
@@ -153,6 +153,7 @@ class WaveReaderConfig(ConfigMixin):
 
     # STFT configuration
     mode: InitVar[str] = 'stft'  # File.get_ffts_freqs
+    cycles: InitVar[int] = 1
     fft_mode: str = 'zoh'
     stft_merge: str = 'power'
     width_ms: float = '1000 / 30'  # Length of each STFT window
@@ -166,12 +167,12 @@ class WaveReaderConfig(ConfigMixin):
     range: Optional[int] = 16
     vol_range: Optional[int] = 16
 
-    def __post_init__(self, wav_path, mode):
+    def __post_init__(self, wav_path, mode, cycles):
         if wav_path is not None:
             if self.files is not None:
                 raise ValueError('Config: cannot provide both wav_path and files[]')
             self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
-            self.files = [FileConfig(wav_path, self.root_pitch, mode=WaveMode[mode])]
+            self.files = [FileConfig(wav_path, self.root_pitch, mode=WaveMode[mode], cycles=cycles)]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
             if self.root_pitch is None:
@@ -240,6 +241,21 @@ def parse_pitch(pitch: Optional[float], wav_path: str, why: str) -> float:
     return pitch
 
 
+def symm_hann(move_x):
+    """Maps [0, 2] to [0, 1, 0]."""
+    xx = move_x
+
+    # Transform xx [0, 2] to [-pi, pi].
+    xx -= 1
+    xx *= np.pi
+    yy = np.cos(xx)
+
+    # Transform yy [-1, 1] to [0, 1].
+    yy += 1.
+    yy /= 2.
+    return yy
+
+
 class WaveMode(Enum):
     Stft = 'stft'
     Cycle = 'cycle'
@@ -256,8 +272,12 @@ class FileConfig(ConfigMixin):
     speed: int = 1
     repitch: int = 1
     mode: WaveMode = WaveMode.Stft
+    cycles: int = 1
 
     def __post_init__(self):
+        if isinstance(self.mode, str):
+            self.mode = WaveMode[self.mode]
+
         self.pitch_estimate = parse_pitch(
             self.pitch_estimate, self.path, 'files[].pitch_estimate')
         self.volume = safe_eval(self.volume)
@@ -267,6 +287,9 @@ class File:
     segment_smp: int = None
     segment_time: float = None
     window: np.ndarray = None
+
+    cfg: FileConfig
+    wcfg: WaveReaderConfig
 
     # The approximate ratio of output/input amplitude (in the absence of compensation).
     # See "tests/stft_volume_scaling/analyze_stft_volume.py" for details.
@@ -348,7 +371,6 @@ class File:
 
         mode = self.cfg.mode
 
-        periodic_fft = []
         fundamental_bin: float = self._get_fundamental_bin(data)
 
         if mode is WaveMode.Stft:
@@ -356,6 +378,7 @@ class File:
             stft = self._stft(data)
 
             # Convert STFT to periodic FFT.
+            periodic_fft = []
             for harmonic in range(rfft_length(nsamp, freq_mul)):
                 begin = fundamental_bin * (harmonic - 0.5)
                 end = fundamental_bin * (harmonic + 0.5)
@@ -365,19 +388,82 @@ class File:
                 periodic_fft.append(amplitude)
 
         elif mode is WaveMode.Cycle:
-            period = round(len(data) / fundamental_bin)
+            nsamp_per_cyc = len(data) / fundamental_bin
 
-            # Pick 1 period of data, from the middle of the region.
-            end = (len(data) + period) // 2
-            begin = end - period
+            cycles = self.cfg.cycles
+            win_nsamp = round(cycles * nsamp_per_cyc)
+            if win_nsamp > len(data):
+                raise ValueError(f'cyclic window overflow error, increase width_ms or decrease cycles')
 
-            periodic_fft = fourier.rfft_norm(data[begin:end])
+            win_data = data[0:win_nsamp]
+
+            if cycles > 1:
+                # Compute a window, evaluating our modified Hann function at coordinates (0, cycles) exclusive.
+
+                # Our window has no DC bias when given multiples of a fundamental (because it's made of rects and
+                # partitions of unity). This means it has a spectrum with nulls at multiples of the fundamental (and
+                # will not cause central aliasing when given a periodic signal).
+                xs = np.arange(win_nsamp, dtype=float)
+                xs += 0.5
+                xs /= (win_nsamp / cycles)
+
+                fsamp_per_cyc: float = win_nsamp / cycles
+                ncyc_per_halfwin: int = cycles // 2
+                fsamp_per_halfwin: float = fsamp_per_cyc * ncyc_per_halfwin
+
+                if cycles & 1:
+                    assert 2 * ncyc_per_halfwin == cycles - 1
+                    window = np.piecewise(
+                        xs, [
+                            xs < fsamp_per_halfwin,
+                            xs > win_nsamp - fsamp_per_halfwin
+                        ], [
+                            lambda xs: symm_hann(xs / fsamp_per_halfwin),
+                            lambda xs: symm_hann((xs - 1) / fsamp_per_halfwin),
+                            1.
+                        ]
+                    )
+                else:
+                    assert 2 * ncyc_per_halfwin == cycles
+                    window = symm_hann(xs / fsamp_per_halfwin)
+
+                win_data *= window
+
+            stft = fourier.rfft_norm(win_data)
+
+            # If you include side bins, you *will* get output aliasing when given a periodic signal.
+            #
+            # The hann window has sidebins strongest midway between fundamental harmonics. We should drop them to
+            # minimize the effect of aliasing, and include other bins at strength `1 - |bin|/(periods/2.0)`.
+            if cycles > 1:
+                periodic_fft = []
+
+                # radius = if cycles = 1-2 -> 0, cycles = 3-4 -> 1...
+                radius = (cycles - 1) // 2
+
+                for harmonic in range(rfft_length(nsamp, freq_mul)):
+                    stft_center = harmonic * cycles
+                    stft_begin = stft_center - radius
+                    stft_end = stft_center + radius + 1
+
+                    bands = stft[stft_begin:stft_end]  # move
+                    if len(bands) == 0:
+                        break
+
+                    xs = np.arange(stft_begin, stft_begin + len(bands))
+                    bands *= (1 - np.abs(xs - stft_center) / (cycles / 2.0))
+
+                    amplitude: complex = self.power_sum(bands)
+                    periodic_fft.append(amplitude)
+
+            else:
+                periodic_fft = stft
 
         else:
             raise ValueError(f'mode=[stft, cycle] (you supplied {mode})')
 
         # Multiply pitch of FFT.
-        freq_mul_fft = zero_pad(periodic_fft, freq_mul)
+        freq_mul_fft = zero_space(periodic_fft, freq_mul)
 
         # Ensure we didn't omit any harmonics <= Nyquist.
         if mode is WaveMode.Stft:

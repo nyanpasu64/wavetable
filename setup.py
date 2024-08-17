@@ -13,8 +13,8 @@ setup(
                       'dataclasses;python_version<"3.7"'],
     entry_points = {
         'console_scripts': [
-            'to-brr=wavetable.to_brr:main',
-            'wave_reader=wavetable.wave_reader:main',
+            'to-brr2=wavetable.to_brr:main',
+            'wave_reader2=wavetable.wave_reader:main',
         ],
     }
 )
