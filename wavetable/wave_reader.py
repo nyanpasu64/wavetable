@@ -377,8 +377,8 @@ class File:
             stft = self._stft(data)
 
             # Convert STFT to periodic FFT.
-            periodic_fft = []
-            for harmonic in range(rfft_length(nsamp, freq_mul)):
+            periodic_fft = [0.]
+            for harmonic in range(1, rfft_length(nsamp, freq_mul)):
                 begin = fundamental_bin * (harmonic - 0.5)
                 end = fundamental_bin * (harmonic + 0.5)
 
@@ -434,12 +434,12 @@ class File:
             # The hann window has sidebins strongest midway between fundamental harmonics. We should drop them to
             # minimize the effect of aliasing, and include other bins at strength `1 - |bin|/(periods/2.0)`.
             if cycles > 1:
-                periodic_fft = []
+                periodic_fft = [0.]
 
                 # radius = if cycles = 1-2 -> 0, cycles = 3-4 -> 1...
                 radius = (cycles - 1) // 2
 
-                for harmonic in range(rfft_length(nsamp, freq_mul)):
+                for harmonic in range(1, rfft_length(nsamp, freq_mul)):
                     stft_center = harmonic * cycles
                     stft_begin = stft_center - radius
                     stft_end = stft_center + radius + 1
