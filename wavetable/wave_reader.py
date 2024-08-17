@@ -172,7 +172,7 @@ class WaveReaderConfig(ConfigMixin):
             if self.files is not None:
                 raise ValueError('Config: cannot provide both wav_path and files[]')
             self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
-            self.files = [FileConfig(wav_path, self.root_pitch, mode=WaveMode[mode], cycles=cycles)]
+            self.files = [FileConfig(wav_path, self.root_pitch, mode=WaveMode(mode), cycles=cycles)]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
             if self.root_pitch is None:
@@ -275,8 +275,7 @@ class FileConfig(ConfigMixin):
     cycles: int = 1
 
     def __post_init__(self):
-        if isinstance(self.mode, str):
-            self.mode = WaveMode[self.mode]
+        self.mode = WaveMode(self.mode)
 
         self.pitch_estimate = parse_pitch(
             self.pitch_estimate, self.path, 'files[].pitch_estimate')
@@ -405,27 +404,26 @@ class File:
                 # will not cause central aliasing when given a periodic signal).
                 xs = np.arange(win_nsamp, dtype=float)
                 xs += 0.5
-                xs /= (win_nsamp / cycles)
 
-                fsamp_per_cyc: float = win_nsamp / cycles
+                sampf_per_cyc: float = win_nsamp / cycles
                 ncyc_per_halfwin: int = cycles // 2
-                fsamp_per_halfwin: float = fsamp_per_cyc * ncyc_per_halfwin
+                sampf_per_halfwin: float = sampf_per_cyc * ncyc_per_halfwin
 
                 if cycles & 1:
                     assert 2 * ncyc_per_halfwin == cycles - 1
                     window = np.piecewise(
                         xs, [
-                            xs < fsamp_per_halfwin,
-                            xs > win_nsamp - fsamp_per_halfwin
+                            xs < sampf_per_halfwin,
+                            xs > win_nsamp - sampf_per_halfwin
                         ], [
-                            lambda xs: symm_hann(xs / fsamp_per_halfwin),
-                            lambda xs: symm_hann((xs - 1) / fsamp_per_halfwin),
+                            lambda xs: symm_hann(xs / sampf_per_halfwin),
+                            lambda xs: symm_hann((xs - 1) / sampf_per_halfwin),
                             1.
                         ]
                     )
                 else:
                     assert 2 * ncyc_per_halfwin == cycles
-                    window = symm_hann(xs / fsamp_per_halfwin)
+                    window = symm_hann(xs / sampf_per_halfwin)
 
                 win_data *= window
 
