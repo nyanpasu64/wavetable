@@ -34,6 +34,9 @@ env_sub: 1       # Subsampling factor for volume and frequency
 sweep: "0:15 | 15:30 30:15"     # Generates synchronized wave and volume envelopes.
 nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
 fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+
+mode: cycle
+cycles: 3
 ```
 
 - foo is subsampled, and each entry is repeated by a factor of `foo_sub`.
