@@ -417,7 +417,7 @@ class File:
                             xs > win_nsamp - sampf_per_halfwin
                         ], [
                             lambda xs: symm_hann(xs / sampf_per_halfwin),
-                            lambda xs: symm_hann((xs - 1) / sampf_per_halfwin),
+                            lambda xs: symm_hann((xs - sampf_per_cyc) / sampf_per_halfwin),
                             1.
                         ]
                     )
