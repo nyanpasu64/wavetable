@@ -153,7 +153,7 @@ class WaveReaderConfig(ConfigMixin):
     sweep: Union[str, list] = ''        # FTI playback indices. Unused waves will be removed.
 
     # STFT configuration
-    mode: InitVar[str] = 'stft'  # File.get_ffts_freqs
+    mode: InitVar[str] = ''  # File.get_ffts_freqs
     cycles: InitVar[int] = 1
     fft_mode: str = 'zoh'
     stft_merge: str = 'power'
@@ -174,9 +174,11 @@ class WaveReaderConfig(ConfigMixin):
                 raise ValueError('Config: cannot provide both wav_path and files[]')
             self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
             self.files = [
-                FileConfig(wav_path, self.root_pitch, transpose=transpose, mode=WaveMode(mode), cycles=cycles)
+                FileConfig(wav_path, self.root_pitch, transpose=transpose, mode=WaveMode(mode or 'stft'), cycles=cycles)
             ]
         else:
+            if mode or (cycles != 1):
+                raise ValueError('must supply mode/cycles per-file')
             self.files = [FileConfig.new(file_info) for file_info in self.files]
             if self.root_pitch is None:
                 if len(self.files) == 1:
