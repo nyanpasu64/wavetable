@@ -29,11 +29,13 @@ pitch_estimate: 83          # MIDI pitch, middle C4 is 60, C5 is 72.
 fps: 240         # Increasing this value will effectively slow the wave down, or transpose the WAV downards. Defaults to 60.
 wave_sub: 2      # Subsampling factor for waves (and wave indices)
 env_sub: 1       # Subsampling factor for volume and frequency
+width_ms: 30
 
 (TODO) wave_locs: 0 1 3 6              # Rip four waves at frames 0,1,3,6, and generate wave envelope 0 1 1 2 2 2 3.
 sweep: "0:15 | 15:30 30:15"     # Generates synchronized wave and volume envelopes.
 nwave: 33        # Truncates output to first `nwave` frames. DO NOT EXCEED 64.
 fft_mode: normal # "zoh" adds a high-frequency boost to compensate for N163 hardware, which may or may not increase high-pitched aliasing sizzle.
+phase_f: 'lambda f: f * f'
 
 mode: cycle
 cycles: 3
