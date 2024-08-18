@@ -141,6 +141,7 @@ class WaveReaderConfig(ConfigMixin):
 
     # Frame rate and subsampling
     fps: float = 60
+    transpose: InitVar[float] = 0.
     wave_sub: int = 1   # Each wave is repeated `wave_sub` times.
     env_sub: int = 1    # Each volume/frequency entry is repeated `env_sub` times.
 
@@ -167,12 +168,14 @@ class WaveReaderConfig(ConfigMixin):
     range: Optional[int] = 16
     vol_range: Optional[int] = 16
 
-    def __post_init__(self, wav_path, mode, cycles):
+    def __post_init__(self, wav_path, transpose, mode, cycles):
         if wav_path is not None:
             if self.files is not None:
                 raise ValueError('Config: cannot provide both wav_path and files[]')
             self.root_pitch = parse_pitch(self.root_pitch, wav_path, 'root_pitch')
-            self.files = [FileConfig(wav_path, self.root_pitch, mode=WaveMode(mode), cycles=cycles)]
+            self.files = [
+                FileConfig(wav_path, self.root_pitch, transpose=transpose, mode=WaveMode(mode), cycles=cycles)
+            ]
         else:
             self.files = [FileConfig.new(file_info) for file_info in self.files]
             if self.root_pitch is None:
@@ -267,6 +270,7 @@ class FileConfig(ConfigMixin):
     path: str
     wav_path = Alias('path')
     pitch_estimate: float = None
+    transpose: float = 0.
 
     channel: int = None
     volume: float = 1.0
@@ -346,6 +350,9 @@ class File:
         return [self._get_periodic_fft_freq(data) for data in self._channel_data_at(time)]
 
     def _channel_data_at(self, time: float):
+        # When transposing a note up, we want to seek the source audio faster. This implies a longer frame duration.
+        time *= 2 ** (self.cfg.transpose / 12)
+
         sample_offset = self.smp_time(time) - int(self.segment_smp * self.wcfg.early)
 
         if sample_offset + self.segment_smp >= len(self.wav):
