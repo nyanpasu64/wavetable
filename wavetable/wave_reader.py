@@ -265,6 +265,7 @@ class WaveMode(Enum):
 class FileConfig(ConfigMixin):
     """ A single WAV file. Each WaveReaderConfig can hold multiple FileConfigs. """
     path: str
+    wav_path = Alias('path')
     pitch_estimate: float = None
 
     channel: int = None
