@@ -586,7 +586,7 @@ class WaveReader:
         else:
             durations = [len(file.wav) / file.smp_s for file in self.files]
             stop_secs = max(durations)
-            stop_frame = self.frame_time(stop_secs) - self.cfg.before_end
+            stop_frame = self.frame_from_time(stop_secs) - self.cfg.before_end
 
         # read_at() for every frame in the audio file.
         frames = range(start_frame, stop_frame)
@@ -636,7 +636,7 @@ class WaveReader:
         Returns wave, frequency, and volume.
         """
 
-        time = self.time_frame(frame)
+        time = self.time_of_frame(frame)
 
         # Compute periodic FFTs.
         ffts = []
@@ -672,10 +672,10 @@ class WaveReader:
 
         return wave, avg_freq_hz, peak
 
-    def time_frame(self, frame):
+    def time_of_frame(self, frame):
         return frame / self.cfg.fps
 
-    def frame_time(self, time):
+    def frame_from_time(self, time):
         return int(time * self.cfg.fps)
 
 
