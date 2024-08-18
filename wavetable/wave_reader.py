@@ -141,7 +141,6 @@ class WaveReaderConfig(ConfigMixin):
 
     # Frame rate and subsampling
     fps: float = 60
-    transpose: float = 0.
     wave_sub: int = 1   # Each wave is repeated `wave_sub` times.
     env_sub: int = 1    # Each volume/frequency entry is repeated `env_sub` times.
 
@@ -189,10 +188,6 @@ class WaveReaderConfig(ConfigMixin):
         else:
             self.width_ms = safe_eval(self.width_ms)
         self.fps = safe_eval(self.fps)
-        # When transposing a note up, we want to seek the source audio faster. This implies a longer frame duration,
-        # or lower FPS.
-        self.fps /= 2 ** (self.transpose / 12)
-
         self.sweep = parse_sweep(self.sweep)
 
 
