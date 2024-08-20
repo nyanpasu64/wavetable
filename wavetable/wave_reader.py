@@ -273,6 +273,7 @@ class FileConfig(ConfigMixin):
     wav_path = Alias('path')
     pitch_estimate: float = None
     transpose: float = 0.
+    start_ms: int = 0
 
     channel: int = None
     volume: float = 1.0
@@ -354,6 +355,9 @@ class File:
     def _channel_data_at(self, time: float):
         # When transposing a note up, we want to seek the source audio faster. This implies a longer frame duration.
         time *= 2 ** (self.cfg.transpose / 12)
+
+        # We do not speak of `speed_shift`.
+        time += self.cfg.start_ms / 1000.
 
         sample_offset = self.smp_time(time) - int(self.segment_smp * self.wcfg.early)
 
