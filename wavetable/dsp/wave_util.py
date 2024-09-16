@@ -1,5 +1,5 @@
 import math
-from typing import NamedTuple
+from typing import NamedTuple, Union
 
 import numpy as np
 from numpy.fft import ifft, fft
@@ -93,7 +93,9 @@ def iround(a):
 
 
 class Rescaler:
-    def __init__(self, maxrange: float, rounding='quantize', translate=True):
+    SUBTRACT_DC = "SUBTRACT_DC"
+
+    def __init__(self, maxrange: float, rounding='quantize', translate: Union[bool, str] = True):
         self.max_range = maxrange
         self.rounding = rounding
         self.translate = translate
@@ -123,10 +125,17 @@ class Rescaler:
         else:
             raise ValueError('self.do_round')
 
-        if self.translate:
-            ys -= np.amin(ys)
-        peak = np.amax(ys)
-        ys /= peak
+        if self.translate == self.SUBTRACT_DC:
+            ys -= np.mean(ys)
+            peak = np.amax(np.abs(ys))
+            ys += peak
+            ys /= 2 * peak
+        else:
+            if self.translate:
+                ys -= np.amin(ys)
+            peak = np.amax(ys)
+            ys /= peak
+
         ys *= max_range
 
         out = _quantize(ys, max_range)

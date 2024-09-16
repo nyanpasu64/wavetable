@@ -166,6 +166,7 @@ class WaveReaderConfig(ConfigMixin):
     # Output bit depth and rounding
     range: Optional[int] = 16
     vol_range: Optional[float] = 16
+    subtract_dc: bool = False
 
     def __post_init__(self, wav_path, transpose, mode, cycles):
         if wav_path is not None:
@@ -581,7 +582,11 @@ class WaveReader:
 
         # Rescaling parameters
         if cfg.range:
-            self.rescaler = Rescaler(cfg.range)
+            if cfg.subtract_dc:
+                translate = Rescaler.SUBTRACT_DC
+            else:
+                translate = True
+            self.rescaler = Rescaler(cfg.range, translate=translate)
 
         if cfg.vol_range:
             self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
