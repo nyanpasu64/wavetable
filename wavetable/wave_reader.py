@@ -164,6 +164,7 @@ class WaveReaderConfig(ConfigMixin):
     early: float = 0.
 
     # Output bit depth and rounding
+    merge_style: str = 'POWER'
     range: Optional[int] = 16
     vol_range: Optional[float] = 16
     subtract_dc: bool = False
@@ -592,7 +593,7 @@ class WaveReader:
             self.vol_rescaler = Rescaler(cfg.vol_range, translate=False)
 
         # Channel merger (arguments irrelevant since we only use merge_ffts())
-        self.merger = Merge(maxrange=None, fft='v1')
+        self.merger = Merge(maxrange=None, merge_style=cfg.merge_style, fft='v1')
 
     def read(self) -> Instr:
         """ read_at() one wave per frame.
