@@ -165,7 +165,7 @@ class WaveReaderConfig(ConfigMixin):
 
     # Output bit depth and rounding
     range: Optional[int] = 16
-    vol_range: Optional[int] = 16
+    vol_range: Optional[float] = 16
 
     def __post_init__(self, wav_path, transpose, mode, cycles):
         if wav_path is not None:

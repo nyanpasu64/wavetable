@@ -83,6 +83,8 @@ def align_waves(waves):
 def quantize(a, y=None):
     if y is None:
         y = math.ceil(max(a))
+    else:
+        y = math.ceil(y)
     return np.minimum(a.astype(int), y - 1)
 
 
@@ -91,7 +93,7 @@ def iround(a):
 
 
 class Rescaler:
-    def __init__(self, maxrange: int, rounding='quantize', translate=True):
+    def __init__(self, maxrange: float, rounding='quantize', translate=True):
         self.max_range = maxrange
         self.rounding = rounding
         self.translate = translate
