@@ -13,6 +13,7 @@ from waveform_analysis.freq_estimation import freq_from_autocorr
 
 from wavetable.dsp import fourier, wave_util, transfers
 from wavetable.dsp.fourier import rfft_length, zero_space, SpectrumType
+from wavetable.dsp.transfers import filter_fft
 from wavetable.dsp.wave_util import Rescaler
 from wavetable.inputs.wave import load_wave
 from wavetable.instrument import Instr, LOOP, RELEASE
@@ -159,6 +160,7 @@ class WaveReaderConfig(ConfigMixin):
     transfer: str = 'transfers.Unity()'
     phase_f: Optional[str] = None
     phase: Union[str, float] = None
+    filter_f: Optional[str] = None
     early: float = 0.
 
     # Output bit depth and rounding
@@ -546,7 +548,6 @@ class WaveReader:
         # TODO switch from dataclasses to attrs, implement these as converters
         if cfg.phase_f:
             self.phase_f = eval(cfg.phase_f)
-
         # converter should use functools.singledispatch
         elif cfg.phase is not None:
             # We want to handle both numbers and expressions.
@@ -561,9 +562,13 @@ class WaveReader:
                 'pi': np.pi,
                 'saw': -np.pi / 2
             })
-
         else:
             self.phase_f = None
+
+        if cfg.filter_f:
+            self.filter_f = eval(cfg.filter_f)
+        else:
+            self.filter_f = None
 
         # STFT mode
         fft_mode = cfg.fft_mode
@@ -673,6 +678,9 @@ class WaveReader:
 
             avg_fft = np.abs(avg_fft).astype(complex)
             avg_fft[first_bin:] *= phasors
+
+        if self.filter_f:
+            avg_fft = filter_fft(avg_fft, self.filter_f)
 
         # Create periodic wave.
         wave = self.irfft(avg_fft, self.cfg.nsamp)
